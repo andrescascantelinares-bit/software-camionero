@@ -1,4 +1,6 @@
 import streamlit as st
+from PIL import Image
+import io
 import plotly.express as px
 import pandas as pd
 from datetime import datetime, timedelta
@@ -127,7 +129,7 @@ if estado_lic == "BLOQUEADO_POR_ADMIN":
     st.link_button("📲 Hablar con Andrés", url_wa)
     st.stop()
 
-# Bloqueo 2: Fecha vencida (PASARELA DE PAGO SINPE)
+# Bloqueo 2: Fecha vencida (PAGO SINPE)
 if estado_lic == "VENCIDO":
     st.title("🚫 Licencia Vencida")
     st.error("El período de servicio de su aplicación ha finalizado.")
@@ -149,6 +151,25 @@ if estado_lic == "VENCIDO":
 # Nagware: Alerta de pocos días
 if estado_lic == "ALERTA":
     st.warning(f"⚠️ AVISO DE SOPORTE: Quedan {dias_restantes} días de servicio. Favor contactar a soporte.")
+
+def comprimir_imagen(uploaded_file):
+    # Abrimos la imagen original
+    img = Image.open(uploaded_file)
+    
+    # Si la imagen está en formato RGBA (con transparencia), 
+    # la pasamos a RGB para que el JPEG no de error
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+    
+    # Creamos un "archivo virtual" en memoria para guardar la compresión
+    buffer = io.BytesIO()
+    
+    # Aquí sucede la magia: bajamos la calidad a 30 (de 100) 
+    # y usamos optimize=True para que pese lo mínimo posible
+    img.save(buffer, format="JPEG", quality=30, optimize=True)
+    buffer.seek(0)
+    
+    return buffer
 
 # --- 6. FUNCIONES DE BASE DE DATOS (NUBE) ---
 def guardar_gasto(fecha, concepto, monto, foto_bytes):
@@ -181,7 +202,7 @@ with tab1:
                     st.success("✅ Viaje guardado.")
                 except Exception:
                     st.error("📡 Sin señal.")
-
+                    
 with tab2:
     st.header("Registrar Gasto")
     with st.form("form_gasto", clear_on_submit=True):
@@ -189,16 +210,25 @@ with tab2:
         concep = st.selectbox("Concepto", ["Diesel", "Peaje", "Mantenimiento", "Comida", "Otros"])
         mon_g = st.number_input("Monto (CRC)", min_value=0, step=1000)
         img_file = st.camera_input("Capturar factura")
+        
         if st.form_submit_button("Guardar Gasto"):
             if mon_g == 0:
                 st.error("⚠️ Monto en cero.")
             else:
                 try:
-                    foto_bin = img_file.getvalue() if img_file else None
+                    # --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
+                    if img_file:
+                        # ✂️ Pasamos la foto por la "prensa" para bajarle el 90% del peso
+                        foto_comprimida = comprimir_imagen(img_file)
+                        foto_bin = foto_comprimida.getvalue()
+                    else:
+                        foto_bin = None
+                    
+                    # Guardamos usando la versión liviana
                     guardar_gasto(f_g.strftime("%Y-%m-%d"), concep, mon_g, foto_bin)
-                    st.success("✅ Gasto guardado.")
-                except Exception:
-                    st.error("📡 Error de conexión.")
+                    st.success("✅ Gasto guardado con ahorro de datos.")
+                except Exception as e:
+                    st.error(f"📡 Error: {e}")
 
 with tab3:
     st.header("📊 Resumen y Excel")
