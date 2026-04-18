@@ -57,9 +57,11 @@ if fondo_path and os.path.exists(fondo_path):
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. CANDADO DIGITAL (LOGIN) ---
+# --- 2. CANDADO DIGITAL (LOGIN MULTI-CLIENTE) ---
 if 'autenticado' not in st.session_state:
     st.session_state['autenticado'] = False
+if 'cliente_id' not in st.session_state:
+    st.session_state['cliente_id'] = None
 
 if not st.session_state['autenticado']:
     st.markdown("<h1 style='text-align: center;'>🔒 Acceso Seguro</h1>", unsafe_allow_html=True)
@@ -71,6 +73,7 @@ if not st.session_state['autenticado']:
         if st.button("Desbloquear Sistema"):
             if pin == "8715": 
                 st.session_state['autenticado'] = True
+                st.session_state['cliente_id'] = "Dany"  # <-- ASIGNACIÓN DE IDENTIDAD
                 st.rerun()
             else:
                 st.error("❌ PIN incorrecto. Acceso denegado.")
@@ -163,10 +166,12 @@ def comprimir_imagen(uploaded_file):
     buffer.seek(0)
     return buffer
 
-# --- 6. FUNCIONES DE BASE DE DATOS (NUBE) ---
+# --- 6. FUNCIONES DE BASE DE DATOS BLINDADAS (NUBE) ---
 def guardar_gasto(fecha, concepto, monto, foto_bytes):
     foto_b64 = base64.b64encode(foto_bytes).decode('utf-8') if foto_bytes else None
-    datos = {"fecha": fecha, "concepto": concepto, "monto": monto, "foto": foto_b64}
+    cliente_actual = st.session_state.get('cliente_id', 'Dany')
+    # <-- SE LE PEGA EL ID DEL CLIENTE AL GUARDAR
+    datos = {"fecha": fecha, "concepto": concepto, "monto": monto, "foto": foto_b64, "cliente_id": cliente_actual}
     supabase.table("gastos").insert(datos).execute()
 
 def eliminar_gasto_db(id_gasto):
@@ -196,7 +201,9 @@ with tabs[0]:
                 st.error("⚠️ Datos incompletos.")
             else:
                 try:
-                    datos_viaje = {"fecha": f.strftime("%Y-%m-%d"), "cliente": cli, "origen": ori, "destino": des, "monto": mon, "notas": not_v}
+                    cliente_actual = st.session_state.get('cliente_id', 'Dany')
+                    # <-- SE LE PEGA EL ID DEL CLIENTE AL GUARDAR VIAJES
+                    datos_viaje = {"fecha": f.strftime("%Y-%m-%d"), "cliente": cli, "origen": ori, "destino": des, "monto": mon, "notas": not_v, "cliente_id": cliente_actual}
                     supabase.table("viajes").insert(datos_viaje).execute()
                     st.success("✅ Viaje guardado.")
                 except Exception:
@@ -231,8 +238,10 @@ if plan_cliente in ["premium", "pro"]:
     with tabs[2]:
         st.header("📊 Resumen y Excel")
         try:
-            res_viajes = supabase.table("viajes").select("*").execute()
-            res_gastos = supabase.table("gastos").select("*").execute()
+            cliente_actual = st.session_state.get('cliente_id', 'Dany')
+            # <-- CANDADO DE SEGURIDAD AL EXTRAER LOS DATOS PARA RESUMEN
+            res_viajes = supabase.table("viajes").select("*").eq("cliente_id", cliente_actual).execute()
+            res_gastos = supabase.table("gastos").select("*").eq("cliente_id", cliente_actual).execute()
             datos_cargados = True
         except Exception:
             st.error("📡 Sin conexión.")
