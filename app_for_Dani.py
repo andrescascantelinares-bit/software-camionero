@@ -9,7 +9,7 @@ import base64
 import os
 
 # --- 0. CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Logística B&J", layout="centered")
+st.set_page_config(page_title="RutaMaster", layout="centered")
 
 # --- INICIALIZAR SUPABASE ---
 @st.cache_resource
@@ -64,8 +64,8 @@ if 'cliente_id' not in st.session_state:
     st.session_state['cliente_id'] = None
 
 if not st.session_state['autenticado']:
-    st.markdown("<h1 style='text-align: center;'>🔒 Acceso Seguro</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Ingrese el PIN autorizado para acceder a Transportes B&J</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🔒 Acceso RutaMaster</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Ingrese el PIN autorizado para acceder a la plataforma</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -90,7 +90,7 @@ def obtener_licencia_remota(cliente_nombre):
     except Exception:
         return "2000-01-01", False, "estandar"
 
-fecha_remota_str, llave_maestra, plan_cliente = obtener_licencia_remota("Dany")
+fecha_remota_str, llave_maestra, plan_cliente = obtener_licencia_remota(st.session_state['cliente_id'])
 
 def verificar_licencia(fecha_fin_str, activa):
     if not activa:
@@ -115,7 +115,7 @@ if logo_path and os.path.exists(logo_path):
     with col2:
         st.image(logo_path, use_container_width=True)
 
-with st.expander("🛡️ Aisaac-Shield & Estado del Plan", expanded=True):
+with st.expander("🛡️ RutaMaster & Aisaac-Shield", expanded=True):
     if estado_lic == "ACTIVO":
         st.success("Soporte técnico: Activo")
     elif estado_lic == "ALERTA":
@@ -186,7 +186,7 @@ with tabs[0]:
         des = st.text_input("Destino")
         mon = st.number_input("Monto Flete (CRC)", min_value=0, step=1000)
         not_v = st.text_area("Notas")
-        if st.form_submit_button("Guardar Viaje"):
+        if st.form_submit_button("Guardar en RutaMaster"):
             if not cli.strip() or mon == 0:
                 st.error("⚠️ Datos incompletos.")
             else:
@@ -210,7 +210,7 @@ with tabs[1]:
         
         img_file = st.file_uploader("📸 Subir foto de factura", type=["png", "jpg", "jpeg"])
         
-        if st.form_submit_button("Guardar Gasto"):
+        if st.form_submit_button("Registrar Gasto"):
             if mon_g == 0:
                 st.error("⚠️ Monto en cero.")
             else:
