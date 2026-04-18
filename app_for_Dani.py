@@ -213,7 +213,8 @@ with tab2:
         f_g = st.date_input("Fecha Gasto", datetime.now())
         concep = st.selectbox("Concepto", ["Diesel", "Peaje", "Mantenimiento", "Comida", "Otros"])
         mon_g = st.number_input("Monto (CRC)", min_value=0, step=1000)
-        img_file = st.camera_input("Capturar factura")
+
+        img_file = st.file_uploader("Tomar foto o subir de galería", type=["png", "jpg", "jpeg"])
         
         if st.form_submit_button("Guardar Gasto"):
             if mon_g == 0:
