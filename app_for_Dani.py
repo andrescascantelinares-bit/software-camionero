@@ -50,6 +50,10 @@ if fondo_path and os.path.exists(fondo_path):
     [data-testid="stDownloadButton"] button {{ background-color: #107C41 !important; color: white !important; font-weight: bold !important; width: 100%; border-radius: 10px; border: none !important; }}
     [data-testid="stLinkButton"] a {{ background-color: #25D366 !important; color: white !important; font-weight: bold !important; width: 100%; border-radius: 10px; border: none !important; text-decoration: none !important; }}
     hr {{ border-color: #333 !important; }}
+    /* Ocultar barra superior, menú y marca de agua */
+    header {{visibility: hidden;}}
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
     </style>
     """, unsafe_allow_html=True)
 
