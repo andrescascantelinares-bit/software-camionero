@@ -77,6 +77,18 @@ if not st.session_state['autenticado']:
                 st.rerun()
             else:
                 st.error("❌ PIN incorrecto. Acceso denegado.")
+    
+    # --- ESCUDO DE PRIVACIDAD PARA TRANSPORTES B&J ---
+    st.markdown("""
+    <div style="background-color: rgba(30, 30, 30, 0.8); border-left: 5px solid #25D366; padding: 15px; border-radius: 8px; margin-top: 30px;">
+        <h4 style="margin-top:0; color: #25D366; font-size: 16px;">🛡️ Protocolo de Confidencialidad</h4>
+        <p style="font-size: 13px; color: #E0E0E0; line-height: 1.5; margin-bottom: 0;">
+            <b>Propiedad:</b> Toda la información ingresada (gastos e ingresos) es propiedad exclusiva de <b>Transportes B&J</b>.<br><br>
+            <b>Seguridad:</b> Sus datos están resguardados en servidores cifrados en la nube y solo son accesibles mediante su PIN privado. El desarrollador no tiene acceso de lectura a sus operaciones diarias.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+                
     st.stop() 
 
 # --- 3. AISAAC-SHIELD NIVEL 1 (CONEXIÓN A LA NUBE) ---
