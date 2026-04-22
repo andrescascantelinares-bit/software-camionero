@@ -15,7 +15,7 @@ def init_conexion():
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 supabase = init_conexion()
-
+# Actualización SaaS
 # --- 1. DISEÑO NEÓN PREMIUM (ESTILO PUMA/ESCAMA) ---
 def get_base64(file_path):
     if file_path and os.path.exists(file_path):
