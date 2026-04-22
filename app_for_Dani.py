@@ -1,4 +1,5 @@
 import streamlit as st
+from fpdf import FPDF
 from PIL import Image
 import io
 import plotly.express as px
@@ -63,12 +64,9 @@ if 'autenticado' not in st.session_state:
 if 'cliente_id' not in st.session_state:
     st.session_state['cliente_id'] = None
 
-# --- 2. CANDADO DIGITAL (LOGIN MULTI-CLIENTE) ---
 if not st.session_state['autenticado']:
     st.markdown("<h1 style='text-align: center;'>🛡️ Aisaac Shield Systems</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;'>Acceso oficial a la plataforma de gestión logística</p>", unsafe_allow_html=True)
-    
-    # ... el resto del código del login que ya tenés ...
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -277,8 +275,51 @@ if plan_cliente in ["premium", "pro"]:
 
                 st.divider()
                 if not df_g_f.empty:
+                    # Botón de Excel existente
                     csv = df_g_f.drop(columns=['foto']).to_csv(index=False).encode('utf-8')
                     st.download_button("📥 Descargar Excel", csv, f"gastos_{m_sel_nom}.csv", "text/csv")
+                    
+                    # --- NUEVA FUNCIÓN: GENERADOR DE PDF ---
+                    def generar_pdf(df_gastos, mes_nombre, año):
+                        pdf = FPDF()
+                        pdf.add_page()
+                        pdf.set_font("Arial", 'B', 16)
+                        
+                        # Encabezado
+                        pdf.cell(200, 10, txt=f"Reporte de Gastos - Transportes B&J", ln=True, align='C')
+                        pdf.set_font("Arial", size=12)
+                        pdf.cell(200, 10, txt=f"Periodo: {mes_nombre} {año}", ln=True, align='C')
+                        pdf.ln(10)
+                        
+                        # Tabla de Gastos
+                        pdf.set_fill_color(200, 220, 255)
+                        pdf.cell(40, 10, "Fecha", 1, 0, 'C', True)
+                        pdf.cell(80, 10, "Concepto", 1, 0, 'C', True)
+                        pdf.cell(40, 10, "Monto (CRC)", 1, 1, 'C', True)
+                        
+                        pdf.set_font("Arial", size=10)
+                        for _, fila in df_gastos.iterrows():
+                            pdf.cell(40, 10, str(fila['fecha'].date()), 1)
+                            pdf.cell(80, 10, str(fila['concepto']), 1)
+                            pdf.cell(40, 10, f"CRC {fila['monto']:,.0f}", 1, 1, 'R')
+                        
+                        # Total Final
+                        pdf.ln(5)
+                        pdf.set_font("Arial", 'B', 12)
+                        total = df_gastos['monto'].sum()
+                        pdf.cell(120, 10, "TOTAL DE GASTOS DEL MES:", 0)
+                        pdf.cell(40, 10, f"CRC {total:,.0f}", 1, 1, 'R')
+                        
+                        return pdf.output(dest='S').encode('latin-1')
+
+                    # --- BOTÓN DE DESCARGA PDF ---
+                    pdf_bytes = generar_pdf(df_g_f, m_sel_nom, a_sel)
+                    st.download_button(
+                        label="📄 Exportar Reporte para Contador (PDF)",
+                        data=pdf_bytes,
+                        file_name=f"Reporte_{m_sel_nom}_{a_sel}.pdf",
+                        mime="application/pdf"
+                    )
                     
                     fig = px.pie(df_g_f, values='monto', names='concepto', hole=0.4, title="Distribución")
                     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="white"))
