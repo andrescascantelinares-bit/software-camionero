@@ -78,6 +78,17 @@ if not st.session_state['autenticado']:
                 st.rerun()
             else:
                 st.error("❌ PIN incorrecto.")
+    
+    # --- PROTOCOLO DE PRIVACIDAD ---
+    st.markdown("""
+    <div style="background-color: rgba(30, 30, 30, 0.8); border-left: 5px solid #25D366; padding: 15px; border-radius: 8px; margin-top: 30px;">
+        <h4 style="margin-top:0; color: #25D366; font-size: 16px;">🛡️ Protocolo de Confidencialidad</h4>
+        <p style="font-size: 13px; color: #E0E0E0; line-height: 1.5; margin-bottom: 0;">
+            <b>Propiedad:</b> Toda la información ingresada (gastos e ingresos) es propiedad exclusiva de <b>Transportes B&J</b>.<br><br>
+            <b>Seguridad:</b> Sus datos están resguardados en servidores cifrados en la nube. El desarrollador no tiene acceso de lectura a sus operaciones diarias.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop() 
 
 # --- GESTIÓN DE LICENCIA ---
@@ -202,9 +213,13 @@ with tabs[2]:
     st.header("🔧 Control Preventivo (Aceite)")
     cliente_actual = st.session_state['cliente_id']
     
-    # Obtener el KM actual del último viaje registrado
-    res_km = supabase.table("viajes").select("km_actual").eq("cliente_id", cliente_actual).order("created_at", desc=True).limit(1).execute()
-    km_ahora = res_km.data[0]['km_actual'] if res_km.data else 0
+    # KM Actual con manejo de errores si no existe la columna
+    try:
+        res_km = supabase.table("viajes").select("km_actual").eq("cliente_id", cliente_actual).order("created_at", desc=True).limit(1).execute()
+        km_ahora = res_km.data[0]['km_actual'] if res_km.data else 0
+    except:
+        km_ahora = 0
+        st.warning("Nota: Agregue la columna 'km_actual' en la tabla de viajes en Supabase para habilitar alertas automáticas.")
     
     # Obtener último mantenimiento
     res_m = supabase.table("mantenimiento").select("*").eq("cliente_id", cliente_actual).order("km_cambio", desc=True).limit(1).execute()
@@ -222,7 +237,6 @@ with tabs[2]:
             col2.warning(f"🔔 Toca pronto: {faltan:,} km faltantes")
         else:
             col2.metric("Siguiente Cambio", f"{m['km_proximo']:,}", delta=f"{faltan:,} km restantes")
-        
         st.divider()
     
     with st.expander("Registrar Nuevo Cambio de Aceite"):
@@ -233,13 +247,12 @@ with tabs[2]:
             if st.form_submit_button("Guardar Registro"):
                 datos_m = {"fecha": f_m.strftime("%Y-%m-%d"), "km_cambio": km_c, "km_proximo": km_p, "cliente_id": cliente_actual}
                 supabase.table("mantenimiento").insert(datos_m).execute()
-                st.success("✅ Sistema de alertas actualizado.")
+                st.success("✅ Registro actualizado.")
                 st.rerun()
 
 if plan_cliente in ["premium", "pro"]:
     with tabs[3]:
         st.header("📊 Resumen y Reportes")
-        # (Aquí va tu código de Reportes y PDF que ya tenemos funcionando perfectamente)
         res_v = supabase.table("viajes").select("*").eq("cliente_id", st.session_state['cliente_id']).execute()
         res_g = supabase.table("gastos").select("*").eq("cliente_id", st.session_state['cliente_id']).execute()
         df_v = pd.DataFrame(res_v.data) if res_v.data else pd.DataFrame()
