@@ -205,37 +205,40 @@ if plan_cliente in ["premium", "pro"]:
                 csv = df_g_f.drop(columns=['foto']).to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Descargar Excel", csv, f"gastos_{m_sel_nom}.csv", "text/csv")
                 
-                # --- VERSIÓN PROFESIONAL DEL GENERADOR DE PDF ---
+                # --- VERSIÓN PROFESIONAL Y CORREGIDA DEL GENERADOR DE PDF ---
                 def generar_pdf(df_gastos, mes_nombre, año):
                     pdf = FPDF()
                     pdf.add_page()
                     
+                    # Función interna para limpiar texto (evita el error de latin-1)
+                    def limpiar(texto):
+                        return str(texto).encode('latin-1', 'replace').decode('latin-1')
+                    
                     # 1. ENCABEZADO CON LOGO
                     if logo_path and os.path.exists(logo_path):
-                        pdf.image(logo_path, x=10, y=8, w=33) # Logo en la esquina
+                        pdf.image(logo_path, x=10, y=8, w=33)
                     
                     pdf.set_font("Arial", 'B', 20)
                     pdf.set_text_color(0, 51, 153) # Azul corporativo
-                    pdf.cell(0, 15, txt="REPORTE MENSUAL DE GASTOS", ln=True, align='R')
+                    pdf.cell(0, 15, txt=limpiar("REPORTE MENSUAL DE GASTOS"), ln=True, align='R')
                     
                     pdf.set_font("Arial", size=10)
                     pdf.set_text_color(100)
-                    pdf.cell(0, 5, txt=f"Empresa: Transportes B&J", ln=True, align='R')
-                    pdf.cell(0, 5, txt=f"Periodo: {mes_nombre} {año}", ln=True, align='R')
-                    pdf.cell(0, 5, txt=f"Fecha de emisión: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='R')
+                    pdf.cell(0, 5, txt=limpiar(f"Empresa: Transportes B&J"), ln=True, align='R')
+                    pdf.cell(0, 5, txt=limpiar(f"Periodo: {mes_nombre} {año}"), ln=True, align='R')
+                    pdf.cell(0, 5, txt=limpiar(f"Fecha de emision: {datetime.now().strftime('%d/%m/%Y')}"), ln=True, align='R')
                     
-                    pdf.ln(20) # Espacio
+                    pdf.ln(20)
                     
                     # 2. TABLA ESTILIZADA
-                    pdf.set_fill_color(0, 51, 153) # Fondo azul para títulos
+                    pdf.set_fill_color(0, 51, 153) # Fondo azul
                     pdf.set_text_color(255) # Texto blanco
                     pdf.set_font("Arial", 'B', 12)
                     
-                    # Anchos de columnas
                     w = [35, 100, 55] 
-                    pdf.cell(w[0], 12, "Fecha", 1, 0, 'C', True)
-                    pdf.cell(w[1], 12, "Concepto de Gasto", 1, 0, 'C', True)
-                    pdf.cell(w[2], 12, "Monto (CRC)", 1, 1, 'C', True)
+                    pdf.cell(w[0], 12, limpiar("Fecha"), 1, 0, 'C', True)
+                    pdf.cell(w[1], 12, limpiar("Concepto de Gasto"), 1, 0, 'C', True)
+                    pdf.cell(w[2], 12, limpiar("Monto (CRC)"), 1, 1, 'C', True)
                     
                     # 3. FILAS DE DATOS
                     pdf.set_text_color(0)
@@ -243,12 +246,11 @@ if plan_cliente in ["premium", "pro"]:
                     
                     fill = False
                     for _, fila in df_gastos.iterrows():
-                        # Efecto de filas cebra (gris claro y blanco)
                         if fill: pdf.set_fill_color(245, 245, 245)
                         else: pdf.set_fill_color(255, 255, 255)
                         
-                        pdf.cell(w[0], 10, str(fila['fecha'].date()), 1, 0, 'C', fill)
-                        pdf.cell(w[1], 10, f"  {str(fila['concepto'])}", 1, 0, 'L', fill)
+                        pdf.cell(w[0], 10, limpiar(fila['fecha'].date()), 1, 0, 'C', fill)
+                        pdf.cell(w[1], 10, f"  {limpiar(fila['concepto'])}", 1, 0, 'L', fill)
                         pdf.cell(w[2], 10, f"CRC {fila['monto']:,.0f}  ", 1, 1, 'R', fill)
                         fill = not fill
 
@@ -256,15 +258,15 @@ if plan_cliente in ["premium", "pro"]:
                     pdf.ln(5)
                     pdf.set_font("Arial", 'B', 12)
                     total = df_gastos['monto'].sum()
-                    pdf.cell(w[0] + w[1], 12, "TOTAL ACUMULADO:", 0, 0, 'R')
-                    pdf.set_fill_color(255, 204, 204) # Fondo rojizo suave para el total
+                    pdf.cell(w[0] + w[1], 12, limpiar("TOTAL ACUMULADO:"), 0, 0, 'R')
+                    pdf.set_fill_color(255, 204, 204) # Fondo suave
                     pdf.cell(w[2], 12, f"CRC {total:,.0f}  ", 1, 1, 'R', True)
                     
-                    # 5. PIE DE PÁGINA (MARCA DE AGUA)
+                    # 5. PIE DE PÁGINA
                     pdf.set_y(-20)
                     pdf.set_font("Arial", 'I', 8)
                     pdf.set_text_color(150)
-                    pdf.cell(0, 10, "Sistema de Gestión Logística generado por Aisaac Shield Systems - aisaac-shield.com", 0, 0, 'C')
+                    pdf.cell(0, 10, limpiar("Sistema generado por Aisaac Shield Systems - aisaac-shield.com"), 0, 0, 'C')
                     
                     return pdf.output(dest='S').encode('latin-1')
 
