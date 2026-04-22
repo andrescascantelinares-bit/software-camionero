@@ -205,21 +205,32 @@ if plan_cliente in ["premium", "pro"]:
                 csv = df_g_f.drop(columns=['foto']).to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Descargar Excel", csv, f"gastos_{m_sel_nom}.csv", "text/csv")
                 
-                # --- VERSIÓN PROFESIONAL Y CORREGIDA DEL GENERADOR DE PDF ---
+                # --- VERSIÓN PROFESIONAL, CORREGIDA Y BLINDADA ---
                 def generar_pdf(df_gastos, mes_nombre, año):
                     pdf = FPDF()
                     pdf.add_page()
                     
-                    # Función interna para limpiar texto (evita el error de latin-1)
                     def limpiar(texto):
                         return str(texto).encode('latin-1', 'replace').decode('latin-1')
                     
-                    # 1. ENCABEZADO CON LOGO
+                    # 1. ENCABEZADO CON LOGO (CORRECCIÓN DE ERROR DE IMAGEN)
                     if logo_path and os.path.exists(logo_path):
-                        pdf.image(logo_path, x=10, y=8, w=33)
+                        try:
+                            # Abrimos la imagen con PIL y la convertimos a RGB para asegurar compatibilidad
+                            img_pil = Image.open(logo_path).convert("RGB")
+                            # La guardamos temporalmente en memoria
+                            img_buffer = io.BytesIO()
+                            img_pil.save(img_buffer, format="JPEG")
+                            img_buffer.seek(0)
+                            
+                            # Insertamos la imagen desde el buffer de memoria
+                            pdf.image(img_buffer, x=10, y=8, w=33, type='JPEG')
+                        except Exception as e:
+                            # Si falla el logo, el PDF sigue generándose sin la imagen para no trabar al usuario
+                            pass
                     
                     pdf.set_font("Arial", 'B', 20)
-                    pdf.set_text_color(0, 51, 153) # Azul corporativo
+                    pdf.set_text_color(0, 51, 153)
                     pdf.cell(0, 15, txt=limpiar("REPORTE MENSUAL DE GASTOS"), ln=True, align='R')
                     
                     pdf.set_font("Arial", size=10)
@@ -231,8 +242,8 @@ if plan_cliente in ["premium", "pro"]:
                     pdf.ln(20)
                     
                     # 2. TABLA ESTILIZADA
-                    pdf.set_fill_color(0, 51, 153) # Fondo azul
-                    pdf.set_text_color(255) # Texto blanco
+                    pdf.set_fill_color(0, 51, 153)
+                    pdf.set_text_color(255)
                     pdf.set_font("Arial", 'B', 12)
                     
                     w = [35, 100, 55] 
@@ -259,7 +270,7 @@ if plan_cliente in ["premium", "pro"]:
                     pdf.set_font("Arial", 'B', 12)
                     total = df_gastos['monto'].sum()
                     pdf.cell(w[0] + w[1], 12, limpiar("TOTAL ACUMULADO:"), 0, 0, 'R')
-                    pdf.set_fill_color(255, 204, 204) # Fondo suave
+                    pdf.set_fill_color(255, 204, 204)
                     pdf.cell(w[2], 12, f"CRC {total:,.0f}  ", 1, 1, 'R', True)
                     
                     # 5. PIE DE PÁGINA
