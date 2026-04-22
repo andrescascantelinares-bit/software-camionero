@@ -17,7 +17,7 @@ def init_conexion():
 
 supabase = init_conexion()
 
-# --- 1. MOTOR DE UTILIDADES (DEBE IR ARRIBA) ---
+# --- 1. MOTOR DE OPTIMIZACIÓN Y UTILIDADES ---
 def procesar_foto(uploaded_file):
     """Reduce el tamaño de la foto para no saturar Supabase"""
     img = Image.open(uploaded_file)
@@ -62,7 +62,7 @@ def generar_pdf(df_gastos, mes, año, logo_p):
         pdf.cell(w[2], 10, f"CRC {row['monto']:,.0f} ", 1, 1, 'R', True)
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 2. LOGIN ---
+# --- 2. LOGIN MULTIUSUARIO ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
@@ -75,7 +75,7 @@ if not st.session_state['autenticado']:
         if st.session_state['autenticado']: st.rerun()
     st.stop()
 
-# --- 3. INTERFAZ ---
+# --- 3. INTERFAZ Y OCULTAR ICONOS ---
 u = st.session_state['user']
 logo_path = st.secrets.get("APP_LOGO_PATH")
 fondo_path = st.secrets.get("APP_BACKGROUND_PATH")
@@ -97,24 +97,59 @@ tabs = st.tabs(["📝 REGISTRO", "🔧 MOTOR", "📊 REPORTES"])
 
 with tabs[0]:
     with st.form("f_reg", clear_on_submit=True):
-        tipo = st.selectbox("Gasto", ["Diesel", "Peaje", "Aceite", "Otros"])
-        monto = st.number_input("Monto (CRC)", min_value=0)
+        col1, col2 = st.columns(2)
+        tipo = col1.selectbox("Gasto", ["Diesel", "Peaje", "Aceite", "Otros"])
+        monto = col2.number_input("Monto (CRC)", min_value=0)
         km = st.number_input("KM Actual", min_value=0)
         foto = st.file_uploader("📷 Foto Comprobante", type=['jpg', 'png', 'jpeg'])
         if st.form_submit_button("SINCRONIZAR"):
             try:
                 foto_b64 = procesar_foto(foto) if foto else None
-                # IMPORTANTE: Debes crear la columna 'foto_comprobante' (tipo text) en Supabase
                 supabase.table("gastos").insert({
-                    "fecha": str(datetime.now().date()), 
-                    "concepto": tipo, 
-                    "monto": monto, 
-                    "cliente_id": u,
-                    "foto_comprobante": foto_b64
+                    "fecha": str(datetime.now().date()), "concepto": tipo, "monto": monto, 
+                    "cliente_id": u, "foto_comprobante": foto_b64
                 }).execute()
                 supabase.table("viajes").insert({"fecha": str(datetime.now().date()), "km_actual": km, "cliente_id": u}).execute()
-                st.success(f"✅ ¡Sincronizado! Datos y foto guardados para {u}")
+                st.success("✅ Datos sincronizados.")
                 st.balloons()
-            except Exception as e: st.error(f"Error: Verifique la columna 'foto_comprobante' en Supabase.")
+            except: st.error("Error: Verifique la columna 'foto_comprobante' en Supabase.")
 
-# ... (Las pestañas de MOTOR y REPORTES se mantienen con las funciones de borrar ya integradas)
+with tabs[1]:
+    try:
+        rk = supabase.table("viajes").select("km_actual").eq("cliente_id", u).order("created_at", desc=True).limit(1).execute()
+        kh = rk.data[0]['km_actual'] if rk.data else 0
+        rm = supabase.table("mantenimiento").select("*").eq("cliente_id", u).order("km_cambio", desc=True).limit(1).execute()
+        if rm.data:
+            m = rm.data[0]; rest = m['km_proximo'] - kh
+            st.metric("Kilometraje Actual", f"{kh:,} km")
+            if rest <= 500: st.error(f"🚨 TALLER URGENTE: {rest} km")
+            else: st.success(f"✅ Aceite OK: {rest} km restantes")
+        else: st.info("Sin registros previos.")
+    except: st.info("Sincronizando...")
+
+with tabs[2]:
+    st.header("📊 Historial con Comprobantes")
+    try:
+        rg = supabase.table("gastos").select("*").eq("cliente_id", u).execute()
+        df = pd.DataFrame(rg.data)
+        if not df.empty:
+            df['fecha'] = pd.to_datetime(df['fecha'])
+            meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+            m_sel = st.selectbox("Seleccione Mes", meses, index=datetime.now().month-1)
+            df_f = df[df['fecha'].dt.month == (meses.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
+            
+            for i, row in df_f.iterrows():
+                c1, c2, c3 = st.columns([0.7, 0.15, 0.15])
+                c1.write(f"📅 {row['fecha'].strftime('%d/%m')} | {row['concepto']} | `CRC {row['monto']:,.0f}`")
+                if row.get('foto_comprobante'):
+                    if c2.button("📷", key=f"img_{row['id']}"):
+                        st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
+                if c3.button("🗑️", key=f"del_{row['id']}"):
+                    supabase.table("gastos").delete().eq("id", row['id']).execute()
+                    st.rerun()
+            
+            st.divider()
+            pdf_b = generar_pdf(df_f, m_sel, 2026, logo_path)
+            st.download_button("📄 Bajar Reporte PDF", pdf_b, "reporte.pdf", "application/pdf")
+        else: st.info("No hay datos.")
+    except: st.error("Error en historial.")
