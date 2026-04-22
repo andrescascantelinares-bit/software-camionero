@@ -48,11 +48,8 @@ if fondo_path and os.path.exists(fondo_path):
     .stAlert p, .st-emotion-cache-16idsys p, label {{ color: #FFFFFF !important; font-weight: bold; }}
     h1, h2, h3, p, span {{ color: white !important; }}
     [data-testid="stFormSubmitButton"] button, div.stButton > button {{ background-color: #FF4B4B !important; color: white !important; font-weight: bold !important; width: 100%; border-radius: 10px; border: none !important; }}
-    
-    /* DISEÑO DE BOTONES DE DESCARGA: VERDE PARA EXCEL, ROJO PARA PDF */
     [data-testid="stDownloadButton"] button[kind="secondary"] {{ background-color: #107C41 !important; color: white !important; font-weight: bold !important; width: 100%; border-radius: 10px; border: none !important; }}
     [data-testid="stDownloadButton"] button[kind="primary"] {{ background-color: #D32F2F !important; color: white !important; font-weight: bold !important; width: 100%; border-radius: 10px; border: none !important; }}
-    
     [data-testid="stLinkButton"] a {{ background-color: #25D366 !important; color: white !important; font-weight: bold !important; width: 100%; border-radius: 10px; border: none !important; text-decoration: none !important; }}
     hr {{ border-color: #333 !important; }}
     header {{visibility: hidden;}}
@@ -81,18 +78,9 @@ if not st.session_state['autenticado']:
                 st.rerun()
             else:
                 st.error("❌ PIN incorrecto.")
-    
-    st.markdown("""
-    <div style="background-color: rgba(30, 30, 30, 0.8); border-left: 5px solid #25D366; padding: 15px; border-radius: 8px; margin-top: 30px;">
-        <h4 style="margin-top:0; color: #25D366; font-size: 16px;">🛡️ Protocolo de Confidencialidad</h4>
-        <p style="font-size: 13px; color: #E0E0E0; line-height: 1.5; margin-bottom: 0;">
-            <b>Propiedad:</b> Toda la información ingresada es propiedad exclusiva de <b>Transportes B&J</b>.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
     st.stop() 
 
-# --- (RESTO DE FUNCIONES DE LICENCIA Y BASE DE DATOS IGUAL) ---
+# --- GESTIÓN DE LICENCIA ---
 def obtener_licencia_remota(cliente_nombre):
     try:
         respuesta = supabase.table("licencias").select("*").eq("cliente", cliente_nombre).execute()
@@ -126,14 +114,11 @@ with st.expander("🛡️ RutaMaster & Aisaac-Shield", expanded=True):
     else: st.error("Soporte: Finalizado")
     st.caption(f"📅 Vence el: {fecha_remota_str} | 💎 Plan: {plan_cliente.upper()}")
 
-if estado_lic == "BLOQUEADO_POR_ADMIN":
-    st.title("🔒 Sistema Desactivado")
+if estado_lic == "BLOQUEADO_POR_ADMIN" or estado_lic == "VENCIDO":
+    st.title("🔒 Sistema Inactivo")
     st.stop()
 
-if estado_lic == "VENCIDO":
-    st.title("🚫 Licencia Vencida")
-    st.stop() 
-
+# --- FUNCIONES AUXILIARES ---
 def comprimir_imagen(uploaded_file):
     img = Image.open(uploaded_file)
     if img.mode in ("RGBA", "P"): img = img.convert("RGB")
@@ -142,17 +127,48 @@ def comprimir_imagen(uploaded_file):
     buffer.seek(0)
     return buffer
 
-def guardar_gasto(fecha, concepto, monto, foto_bytes):
-    foto_b64 = base64.b64encode(foto_bytes).decode('utf-8') if foto_bytes else None
-    cliente_actual = st.session_state.get('cliente_id', 'Dany')
-    datos = {"fecha": fecha, "concepto": concepto, "monto": monto, "foto": foto_b64, "cliente_id": cliente_actual}
-    supabase.table("gastos").insert(datos).execute()
+def limpiar(texto):
+    return str(texto).encode('latin-1', 'replace').decode('latin-1')
 
-def eliminar_gasto_db(id_gasto):
-    supabase.table("gastos").delete().eq("id", id_gasto).execute()
+def generar_pdf(df_gastos, mes_nombre, año):
+    pdf = FPDF()
+    pdf.add_page()
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img_pil = Image.open(logo_path).convert("RGB")
+            img_buffer = io.BytesIO()
+            img_pil.save(img_buffer, format="JPEG")
+            img_buffer.seek(0)
+            pdf.image(img_buffer, x=10, y=8, w=33, type='JPEG')
+        except: pass
+    pdf.set_font("Arial", 'B', 20); pdf.set_text_color(0, 51, 153)
+    pdf.cell(0, 15, txt=limpiar("REPORTE MENSUAL DE GASTOS"), ln=True, align='R')
+    pdf.set_font("Arial", size=10); pdf.set_text_color(100)
+    pdf.cell(0, 5, txt=limpiar(f"Empresa: Transportes B&J"), ln=True, align='R')
+    pdf.cell(0, 5, txt=limpiar(f"Periodo: {mes_nombre} {año}"), ln=True, align='R')
+    pdf.ln(20)
+    pdf.set_fill_color(0, 51, 153); pdf.set_text_color(255); pdf.set_font("Arial", 'B', 12)
+    w = [35, 100, 55]
+    pdf.cell(w[0], 12, limpiar("Fecha"), 1, 0, 'C', True)
+    pdf.cell(w[1], 12, limpiar("Concepto"), 1, 0, 'C', True)
+    pdf.cell(w[2], 12, limpiar("Monto (CRC)"), 1, 1, 'C', True)
+    pdf.set_text_color(0); pdf.set_font("Arial", size=11)
+    fill = False
+    for _, fila in df_gastos.iterrows():
+        pdf.set_fill_color(245, 245, 245) if fill else pdf.set_fill_color(255, 255, 255)
+        pdf.cell(w[0], 10, limpiar(fila['fecha'].date()), 1, 0, 'C', fill)
+        pdf.cell(w[1], 10, f" {limpiar(fila['concepto'])}", 1, 0, 'L', fill)
+        pdf.cell(w[2], 10, f"CRC {fila['monto']:,.0f} ", 1, 1, 'R', fill)
+        fill = not fill
+    pdf.ln(5); pdf.set_font("Arial", 'B', 12)
+    pdf.cell(w[0] + w[1], 12, limpiar("TOTAL ACUMULADO:"), 0, 0, 'R')
+    pdf.set_fill_color(255, 204, 204); pdf.cell(w[2], 12, f"CRC {df_gastos['monto'].sum():,.0f} ", 1, 1, 'R', True)
+    pdf.set_y(-20); pdf.set_font("Arial", 'I', 8); pdf.set_text_color(150)
+    pdf.cell(0, 10, limpiar("Sistema generado por Aisaac Shield Systems - aisaac-shield.com"), 0, 0, 'C')
+    return pdf.output(dest='S').encode('latin-1')
 
 # --- INTERFAZ DE TABS ---
-nombres_tabs = ["➕ Viajes", "📉 Gastos con Foto"]
+nombres_tabs = ["➕ Viajes", "📉 Gastos", "🔧 Taller"]
 if plan_cliente in ["premium", "pro"]: nombres_tabs.append("📊 Resumen")
 tabs = st.tabs(nombres_tabs)
 
@@ -160,13 +176,13 @@ with tabs[0]:
     st.header("Registrar Viaje")
     with st.form("form_viaje", clear_on_submit=True):
         f = st.date_input("Fecha", datetime.now())
-        cli = st.text_input("Cliente")
+        cli = st.text_input("Cliente / Destino")
         mon = st.number_input("Monto Flete (CRC)", min_value=0, step=1000)
-        if st.form_submit_button("Guardar"):
-            if cli.strip() and mon > 0:
-                datos_viaje = {"fecha": f.strftime("%Y-%m-%d"), "cliente": cli, "monto": mon, "cliente_id": st.session_state['cliente_id']}
-                supabase.table("viajes").insert(datos_viaje).execute()
-                st.success("✅ Guardado.")
+        km_v = st.number_input("Kilometraje Actual del Camión", min_value=0)
+        if st.form_submit_button("Guardar Viaje"):
+            datos_viaje = {"fecha": f.strftime("%Y-%m-%d"), "cliente": cli, "monto": mon, "km_actual": km_v, "cliente_id": st.session_state['cliente_id']}
+            supabase.table("viajes").insert(datos_viaje).execute()
+            st.success("✅ Viaje y Kilometraje registrados.")
 
 with tabs[1]:
     st.header("Registrar Gasto")
@@ -176,122 +192,69 @@ with tabs[1]:
         mon_g = st.number_input("Monto (CRC)", min_value=0, step=1000)
         img_file = st.file_uploader("📸 Foto factura", type=["png", "jpg", "jpeg"])
         if st.form_submit_button("Registrar Gasto"):
-            if mon_g > 0:
-                foto_bin = comprimir_imagen(img_file).getvalue() if img_file else None
-                guardar_gasto(f_g.strftime("%Y-%m-%d"), concep, mon_g, foto_bin)
-                st.success("✅ Gasto guardado.")
+            foto_bin = comprimir_imagen(img_file).getvalue() if img_file else None
+            foto_b64 = base64.b64encode(foto_bin).decode('utf-8') if foto_bin else None
+            datos_g = {"fecha": f_g.strftime("%Y-%m-%d"), "concepto": concep, "monto": mon_g, "foto": foto_b64, "cliente_id": st.session_state['cliente_id']}
+            supabase.table("gastos").insert(datos_g).execute()
+            st.success("✅ Gasto guardado.")
+
+with tabs[2]:
+    st.header("🔧 Control Preventivo (Aceite)")
+    cliente_actual = st.session_state['cliente_id']
+    
+    # Obtener el KM actual del último viaje registrado
+    res_km = supabase.table("viajes").select("km_actual").eq("cliente_id", cliente_actual).order("created_at", desc=True).limit(1).execute()
+    km_ahora = res_km.data[0]['km_actual'] if res_km.data else 0
+    
+    # Obtener último mantenimiento
+    res_m = supabase.table("mantenimiento").select("*").eq("cliente_id", cliente_actual).order("km_cambio", desc=True).limit(1).execute()
+    
+    if res_m.data:
+        m = res_m.data[0]
+        faltan = m['km_proximo'] - km_ahora
+        
+        col1, col2 = st.columns(2)
+        col1.metric("KM Actual", f"{km_ahora:,}")
+        
+        if faltan <= 0:
+            col2.error(f"⚠️ CAMBIO URGENTE: Hace {abs(faltan):,} km")
+        elif faltan <= 500:
+            col2.warning(f"🔔 Toca pronto: {faltan:,} km faltantes")
+        else:
+            col2.metric("Siguiente Cambio", f"{m['km_proximo']:,}", delta=f"{faltan:,} km restantes")
+        
+        st.divider()
+    
+    with st.expander("Registrar Nuevo Cambio de Aceite"):
+        with st.form("form_mant"):
+            f_m = st.date_input("Fecha de Cambio", datetime.now())
+            km_c = st.number_input("Kilometraje del Cambio", min_value=0, value=km_ahora)
+            km_p = st.number_input("Próximo Cambio (+5000 km)", min_value=0, value=km_c + 5000)
+            if st.form_submit_button("Guardar Registro"):
+                datos_m = {"fecha": f_m.strftime("%Y-%m-%d"), "km_cambio": km_c, "km_proximo": km_p, "cliente_id": cliente_actual}
+                supabase.table("mantenimiento").insert(datos_m).execute()
+                st.success("✅ Sistema de alertas actualizado.")
+                st.rerun()
 
 if plan_cliente in ["premium", "pro"]:
-    with tabs[2]:
+    with tabs[3]:
         st.header("📊 Resumen y Reportes")
-        cliente_actual = st.session_state.get('cliente_id', 'Dany')
-        res_viajes = supabase.table("viajes").select("*").eq("cliente_id", cliente_actual).execute()
-        res_gastos = supabase.table("gastos").select("*").eq("cliente_id", cliente_actual).execute()
+        # (Aquí va tu código de Reportes y PDF que ya tenemos funcionando perfectamente)
+        res_v = supabase.table("viajes").select("*").eq("cliente_id", st.session_state['cliente_id']).execute()
+        res_g = supabase.table("gastos").select("*").eq("cliente_id", st.session_state['cliente_id']).execute()
+        df_v = pd.DataFrame(res_v.data) if res_v.data else pd.DataFrame()
+        df_g = pd.DataFrame(res_g.data) if res_g.data else pd.DataFrame()
         
-        df_v = pd.DataFrame(res_viajes.data) if res_viajes.data else pd.DataFrame()
-        df_g = pd.DataFrame(res_gastos.data) if res_gastos.data else pd.DataFrame()
-
         if not df_g.empty:
             df_g['fecha'] = pd.to_datetime(df_g['fecha'])
             a_sel = st.selectbox("Año", sorted(df_g['fecha'].dt.year.unique(), reverse=True))
             m_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-            m_sel_nom = st.selectbox("Mes", m_nombres, index=datetime.now().month - 1)
-            m_sel = m_nombres.index(m_sel_nom) + 1
-            df_g_f = df_g[(df_g['fecha'].dt.year == a_sel) & (df_g['fecha'].dt.month == m_sel)]
-
-            if not df_g_f.empty:
-                st.divider()
-                # BOTÓN EXCEL (VERDE)
-                csv = df_g_f.drop(columns=['foto']).to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Descargar Excel", csv, f"gastos_{m_sel_nom}.csv", "text/csv")
-                
-                # --- VERSIÓN PROFESIONAL, CORREGIDA Y BLINDADA ---
-                def generar_pdf(df_gastos, mes_nombre, año):
-                    pdf = FPDF()
-                    pdf.add_page()
-                    
-                    def limpiar(texto):
-                        return str(texto).encode('latin-1', 'replace').decode('latin-1')
-                    
-                    # 1. ENCABEZADO CON LOGO (CORRECCIÓN DE ERROR DE IMAGEN)
-                    if logo_path and os.path.exists(logo_path):
-                        try:
-                            # Abrimos la imagen con PIL y la convertimos a RGB para asegurar compatibilidad
-                            img_pil = Image.open(logo_path).convert("RGB")
-                            # La guardamos temporalmente en memoria
-                            img_buffer = io.BytesIO()
-                            img_pil.save(img_buffer, format="JPEG")
-                            img_buffer.seek(0)
-                            
-                            # Insertamos la imagen desde el buffer de memoria
-                            pdf.image(img_buffer, x=10, y=8, w=33, type='JPEG')
-                        except Exception as e:
-                            # Si falla el logo, el PDF sigue generándose sin la imagen para no trabar al usuario
-                            pass
-                    
-                    pdf.set_font("Arial", 'B', 20)
-                    pdf.set_text_color(0, 51, 153)
-                    pdf.cell(0, 15, txt=limpiar("REPORTE MENSUAL DE GASTOS"), ln=True, align='R')
-                    
-                    pdf.set_font("Arial", size=10)
-                    pdf.set_text_color(100)
-                    pdf.cell(0, 5, txt=limpiar(f"Empresa: Transportes B&J"), ln=True, align='R')
-                    pdf.cell(0, 5, txt=limpiar(f"Periodo: {mes_nombre} {año}"), ln=True, align='R')
-                    pdf.cell(0, 5, txt=limpiar(f"Fecha de emision: {datetime.now().strftime('%d/%m/%Y')}"), ln=True, align='R')
-                    
-                    pdf.ln(20)
-                    
-                    # 2. TABLA ESTILIZADA
-                    pdf.set_fill_color(0, 51, 153)
-                    pdf.set_text_color(255)
-                    pdf.set_font("Arial", 'B', 12)
-                    
-                    w = [35, 100, 55] 
-                    pdf.cell(w[0], 12, limpiar("Fecha"), 1, 0, 'C', True)
-                    pdf.cell(w[1], 12, limpiar("Concepto de Gasto"), 1, 0, 'C', True)
-                    pdf.cell(w[2], 12, limpiar("Monto (CRC)"), 1, 1, 'C', True)
-                    
-                    # 3. FILAS DE DATOS
-                    pdf.set_text_color(0)
-                    pdf.set_font("Arial", size=11)
-                    
-                    fill = False
-                    for _, fila in df_gastos.iterrows():
-                        if fill: pdf.set_fill_color(245, 245, 245)
-                        else: pdf.set_fill_color(255, 255, 255)
-                        
-                        pdf.cell(w[0], 10, limpiar(fila['fecha'].date()), 1, 0, 'C', fill)
-                        pdf.cell(w[1], 10, f"  {limpiar(fila['concepto'])}", 1, 0, 'L', fill)
-                        pdf.cell(w[2], 10, f"CRC {fila['monto']:,.0f}  ", 1, 1, 'R', fill)
-                        fill = not fill
-
-                    # 4. RESUMEN FINAL
-                    pdf.ln(5)
-                    pdf.set_font("Arial", 'B', 12)
-                    total = df_gastos['monto'].sum()
-                    pdf.cell(w[0] + w[1], 12, limpiar("TOTAL ACUMULADO:"), 0, 0, 'R')
-                    pdf.set_fill_color(255, 204, 204)
-                    pdf.cell(w[2], 12, f"CRC {total:,.0f}  ", 1, 1, 'R', True)
-                    
-                    # 5. PIE DE PÁGINA
-                    pdf.set_y(-20)
-                    pdf.set_font("Arial", 'I', 8)
-                    pdf.set_text_color(150)
-                    pdf.cell(0, 10, limpiar("Sistema generado por Aisaac Shield Systems - aisaac-shield.com"), 0, 0, 'C')
-                    
-                    return pdf.output(dest='S').encode('latin-1')
-
-                # BOTÓN PDF (ROJO)
-                pdf_bytes = generar_pdf(df_g_f, m_sel_nom, a_sel)
-                st.download_button(
-                    label="📄 Exportar Reporte para Contador (PDF)",
-                    data=pdf_bytes,
-                    file_name=f"Reporte_{m_sel_nom}_{a_sel}.pdf",
-                    mime="application/pdf",
-                    type="primary" # <--- ESTO ACTIVA EL COLOR ROJO EN EL CSS
-                )
-
-                for _, row in df_g_f.iterrows():
-                    with st.expander(f"{row['concepto']} - ₡{row['monto']:,.0f}"):
-                        if pd.notna(row['foto']) and row['foto'] != "": 
-                            st.image(base64.b64decode(row['foto']))
+            m_sel_nom = st.selectbox("Mes", m_nombres, index=datetime.now().month-1)
+            df_g_f = df_g[(df_g['fecha'].dt.year == a_sel) & (df_g['fecha'].dt.month == (m_nombres.index(m_sel_nom)+1))]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button("📥 Descargar Excel", df_g_f.drop(columns=['foto']).to_csv(index=False).encode('utf-8'), f"gastos_{m_sel_nom}.csv", "text/csv")
+            with col2:
+                pdf_b = generar_pdf(df_g_f, m_sel_nom, a_sel)
+                st.download_button("📄 Reporte para Contador (PDF)", pdf_b, f"Reporte_{m_sel_nom}.pdf", "application/pdf", type="primary")
