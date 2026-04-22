@@ -63,9 +63,12 @@ if 'autenticado' not in st.session_state:
 if 'cliente_id' not in st.session_state:
     st.session_state['cliente_id'] = None
 
+# --- 2. CANDADO DIGITAL (LOGIN MULTI-CLIENTE) ---
 if not st.session_state['autenticado']:
-    st.markdown("<h1 style='text-align: center;'>🔒 Acceso RutaMaster</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Ingrese el PIN autorizado para acceder a la plataforma</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🛡️ Aisaac Shield Systems</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Acceso oficial a la plataforma de gestión logística</p>", unsafe_allow_html=True)
+    
+    # ... el resto del código del login que ya tenés ...
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
