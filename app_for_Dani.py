@@ -62,7 +62,7 @@ def generar_pdf(df_gastos, mes, año, logo_p):
         pdf.cell(w[2], 10, f"CRC {row['monto']:,.0f} ", 1, 1, 'R', True)
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 2. LOGIN MULTIUSUARIO ---
+# --- 2. LOGIN MULTIUSUARIO (AMBOS PINES ACTIVOS) ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
@@ -93,7 +93,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
-tabs = st.tabs(["📝 REGISTRO", "🔧 MOTOR", "📊 REPORTES"])
+tabs = st.tabs(["📝 REGISTRO", "🔧 MOTOR", "📊 DATOS Y REPORTES"])
 
 with tabs[0]:
     with st.form("f_reg", clear_on_submit=True):
@@ -112,7 +112,7 @@ with tabs[0]:
                 supabase.table("viajes").insert({"fecha": str(datetime.now().date()), "km_actual": km, "cliente_id": u}).execute()
                 st.success("✅ Datos sincronizados.")
                 st.balloons()
-            except: st.error("Error: Verifique la columna 'foto_comprobante' en Supabase.")
+            except: st.error("Error: Verifique la base de datos.")
 
 with tabs[1]:
     try:
@@ -127,8 +127,9 @@ with tabs[1]:
         else: st.info("Sin registros previos.")
     except: st.info("Sincronizando...")
 
+# --- PESTAÑA 3: RESTAURADA CON GRÁFICOS Y TABLAS ---
 with tabs[2]:
-    st.header("📊 Historial con Comprobantes")
+    st.header("📊 Datos y Reportes")
     try:
         rg = supabase.table("gastos").select("*").eq("cliente_id", u).execute()
         df = pd.DataFrame(rg.data)
@@ -138,18 +139,37 @@ with tabs[2]:
             m_sel = st.selectbox("Seleccione Mes", meses, index=datetime.now().month-1)
             df_f = df[df['fecha'].dt.month == (meses.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
             
-            for i, row in df_f.iterrows():
-                c1, c2, c3 = st.columns([0.7, 0.15, 0.15])
-                c1.write(f"📅 {row['fecha'].strftime('%d/%m')} | {row['concepto']} | `CRC {row['monto']:,.0f}`")
-                if row.get('foto_comprobante'):
-                    if c2.button("📷", key=f"img_{row['id']}"):
-                        st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
-                if c3.button("🗑️", key=f"del_{row['id']}"):
-                    supabase.table("gastos").delete().eq("id", row['id']).execute()
-                    st.rerun()
-            
-            st.divider()
-            pdf_b = generar_pdf(df_f, m_sel, 2026, logo_path)
-            st.download_button("📄 Bajar Reporte PDF", pdf_b, "reporte.pdf", "application/pdf")
-        else: st.info("No hay datos.")
-    except: st.error("Error en historial.")
+            if not df_f.empty:
+                # 1. TOTAL DE GASTOS (Métrica principal)
+                total_mes = df_f['monto'].sum()
+                st.metric(f"Total Gastos {m_sel}", f"CRC {total_mes:,.0f}")
+                
+                # 2. GRÁFICO DE BARRAS (Restaurado)
+                st.subheader("📈 Gráfico por Concepto")
+                grafico_datos = df_f.groupby('concepto')['monto'].sum()
+                st.bar_chart(grafico_datos)
+                
+                # 3. TABLA DE DATOS LIMPIA (Restaurada)
+                st.subheader("📋 Tabla de Gastos")
+                st.dataframe(df_f[['fecha', 'concepto', 'monto']], hide_index=True, use_container_width=True)
+                
+                # 4. BOTONES OCULTOS (Para que no ensucien la tabla)
+                with st.expander("🛠️ Administrar (Ver Fotos y Borrar)"):
+                    for i, row in df_f.iterrows():
+                        c1, c2, c3 = st.columns([0.6, 0.2, 0.2])
+                        c1.write(f"📅 {row['fecha'].strftime('%d/%m')} | {row['concepto']}")
+                        if row.get('foto_comprobante'):
+                            if c2.button("📷 Ver", key=f"img_{row['id']}"):
+                                st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
+                        if c3.button("🗑️ Borrar", key=f"del_{row['id']}"):
+                            supabase.table("gastos").delete().eq("id", row['id']).execute()
+                            st.rerun()
+                
+                st.divider()
+                col1, col2 = st.columns(2)
+                col1.download_button("📥 Excel", df_f.to_csv(index=False).encode('utf-8'), "gastos.csv", "text/csv")
+                pdf_b = generar_pdf(df_f, m_sel, 2026, logo_path)
+                col2.download_button("📄 PDF Reporte", pdf_b, "reporte.pdf", "application/pdf")
+            else: st.info(f"No hay gastos registrados en {m_sel}.")
+        else: st.info("No hay historial.")
+    except Exception as e: st.error(f"Error cargando historial: {e}")
