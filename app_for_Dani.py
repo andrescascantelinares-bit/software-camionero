@@ -67,7 +67,7 @@ meses_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
 st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
 
 # CREAMOS EL DESPLEGABLE QUE NO ACTIVA EL TECLADO
-with st.expander(f"📅 PERIODO ACTUAL: {st.session_state.get('mes_f', meses_nombres[datetime.now().month-1])}", expanded=False):
+with st.expander(f" {st.session_state.get('mes_f', meses_nombres[datetime.now().month-1])}", expanded=False):
     m_sel = st.segmented_control(
         "Seleccione el mes para ver los datos:", 
         options=meses_nombres, 
