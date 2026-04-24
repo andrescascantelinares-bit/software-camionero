@@ -31,7 +31,21 @@ def get_base64(file_path):
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-# --- 2. LOGIN (RESTAURADO) ---
+# --- 2. DISEÑO VISUAL GLOBAL (Movido aquí para arreglar el Login blanco) ---
+fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH") if "APP_BACKGROUND_PATH" in st.secrets else None)
+
+st.markdown(f"""
+<style>
+    [data-testid="stHeader"], .stDeployButton, footer {{ visibility: hidden; display: none !important; }}
+    .stApp {{ background-color: #000 !important; {f"background-image: url(data:image/png;base64,{fondo_b64});" if fondo_b64 else ""} background-size: cover; }}
+    [data-testid="stAppViewBlockContainer"] {{ background-color: rgba(5, 5, 5, 0.95); padding: 2.5rem; border-radius: 30px; border: 1px solid #25D366; }}
+    .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border-left: 6px solid #25D366; margin-bottom: 15px; border-right: 1px solid rgba(37, 211, 102, 0.2); }}
+    h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
+    .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
+</style>
+""", unsafe_allow_html=True)
+
+# --- 3. LOGIN (RESTAURADO) ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
@@ -44,26 +58,13 @@ if not st.session_state['autenticado']:
         if st.session_state['autenticado']: st.rerun()
     st.stop()
 
-# --- 3. DISEÑO VISUAL ---
+# --- 4. CARGA DE DATOS CENTRALIZADA ---
 u = st.session_state['user']
 meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-
-fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH"))
-st.markdown(f"""
-<style>
-    [data-testid="stHeader"], .stDeployButton, footer {{ visibility: hidden; display: none !important; }}
-    .stApp {{ background-color: #000; {f"background-image: url(data:image/png;base64,{fondo_b64});" if fondo_b64 else ""} background-size: cover; }}
-    [data-testid="stAppViewBlockContainer"] {{ background-color: rgba(5, 5, 5, 0.95); padding: 2.5rem; border-radius: 30px; border: 1px solid #25D366; }}
-    .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border-left: 6px solid #25D366; margin-bottom: 15px; border-right: 1px solid rgba(37, 211, 102, 0.2); }}
-    h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
-    .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
-</style>
-""", unsafe_allow_html=True)
 
 st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
 m_sel = st.selectbox("📅 Seleccione el periodo:", meses, index=datetime.now().month-1)
 
-# CARGA DE DATOS CENTRALIZADA
 df_f = pd.DataFrame()
 km_actual = 0
 try:
@@ -80,35 +81,37 @@ except Exception as e:
 
 tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
-# --- TAB 1: REGISTRO (CON OPCIÓN DE VIAJE INDEPENDIENTE) ---
+# --- TAB 1: REGISTRO UNIFICADO ---
 with tabs[0]:
-    # SECCIÓN DE GASTOS
-    st.subheader("💰 Reportar Gasto")
-    with st.form("f_gasto", clear_on_submit=True):
+    st.subheader("📝 Reportar Movimiento")
+    with st.form("f_registro", clear_on_submit=True):
         c1, c2 = st.columns(2)
-        tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
-        monto = c2.number_input("Monto (CRC)", value=None, placeholder="0", step=500)
-        foto = st.file_uploader("📷 Foto Comprobante", type=['jpg', 'png', 'jpeg'])
-        if st.form_submit_button("GUARDAR GASTO"):
-            if monto:
-                f_bytes = procesar_foto(foto) if foto else None
-                supabase.table("gastos").insert({"fecha": str(datetime.now().date()), "concepto": tipo, "monto": monto, "cliente_id": u, "foto_comprobante": f_bytes}).execute()
-                st.success("✅ Gasto sincronizado")
-                st.rerun()
-            else: st.warning("Ingrese el monto del gasto")
-
-    st.divider()
-
-    # SECCIÓN DE VIAJES (LO QUE HACÍA FALTA)
-    st.subheader("🛣️ Registrar Viaje")
-    with st.form("f_viaje", clear_on_submit=True):
+        tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros", "Viaje (Solo KM)"])
+        monto = c2.number_input("Monto (CRC)", value=None, placeholder="Opcional", step=500)
+        
+        # El campo de Kilometraje vuelve a estar aquí mismo
         km = st.number_input("Kilometraje Actual", value=None, placeholder=f"Último: {km_actual} KM", step=1)
-        if st.form_submit_button("REGISTRAR KM"):
-            if km:
-                supabase.table("viajes").insert({"fecha": str(datetime.now().date()), "km_actual": km, "cliente_id": u}).execute()
-                st.success("✅ Kilometraje actualizado")
-                st.rerun()
-            else: st.warning("Ingrese el kilometraje actual")
+        foto = st.file_uploader("📷 Foto Comprobante", type=['jpg', 'png', 'jpeg'])
+        
+        if st.form_submit_button("GUARDAR REGISTRO"):
+            if monto or km:
+                try:
+                    # Guardar Gasto si hay monto
+                    if monto:
+                        f_bytes = procesar_foto(foto) if foto else None
+                        supabase.table("gastos").insert({"fecha": str(datetime.now().date()), "concepto": tipo, "monto": monto, "cliente_id": u, "foto_comprobante": f_bytes}).execute()
+                    
+                    # Guardar Viaje si hay KM
+                    if km:
+                        supabase.table("viajes").insert({"fecha": str(datetime.now().date()), "km_actual": km, "cliente_id": u}).execute()
+                        
+                    st.success("✅ Registro guardado con éxito")
+                    st.balloons()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar: {e}")
+            else: 
+                st.warning("⚠️ Debe ingresar un Monto o el Kilometraje para guardar.")
 
 # --- TAB 2: GASTOS ---
 with tabs[1]:
