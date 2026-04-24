@@ -33,7 +33,7 @@ def get_base64(file_path):
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-# --- 2. DISEÑO VISUAL GLOBAL ---
+# --- 2. DISEÑO VISUAL CON LUCES ANIMADAS ---
 fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH") if "APP_BACKGROUND_PATH" in st.secrets else None)
 
 st.markdown(f"""
@@ -45,40 +45,47 @@ st.markdown(f"""
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
     
-    /* ESTILO PARA LOS LETREROS DE AISAAC-SHIELD */
+    /* ANIMACIÓN DE LUCES NEÓN */
+    @keyframes neon-pulse {{
+        0% {{ border-color: rgba(37, 211, 102, 0.3); box-shadow: 0 0 5px rgba(37, 211, 102, 0.2); }}
+        50% {{ border-color: rgba(37, 211, 102, 1); box-shadow: 0 0 20px rgba(37, 211, 102, 0.6); }}
+        100% {{ border-color: rgba(37, 211, 102, 0.3); box-shadow: 0 0 5px rgba(37, 211, 102, 0.2); }}
+    }}
+
     .shield-box {{ 
         margin: 20px 0; 
-        padding: 15px; 
+        padding: 20px; 
         text-align: center; 
-        background: 
-            linear-gradient(to right, #25D366 3px, transparent 3px) 0 0,
-            linear-gradient(to bottom, #25D366 3px, transparent 3px) 0 0,
-            linear-gradient(to left, #25D366 3px, transparent 3px) 100% 0,
-            linear-gradient(to bottom, #25D366 3px, transparent 3px) 100% 0,
-            linear-gradient(to right, #25D366 3px, transparent 3px) 0 100%,
-            linear-gradient(to top, #25D366 3px, transparent 3px) 0 100%,
-            linear-gradient(to left, #25D366 3px, transparent 3px) 100% 100%,
-            linear-gradient(to top, #25D366 3px, transparent 3px) 100% 100%;
-        background-repeat: no-repeat;
-        background-size: 15px 15px;
         background-color: rgba(37, 211, 102, 0.05);
-        border: 1px solid rgba(37, 211, 102, 0.1);
+        border: 2px solid #25D366;
+        animation: neon-pulse 2s infinite ease-in-out;
+        /* Esquinas decorativas tecnológicas */
+        background: 
+            linear-gradient(to right, #25D366 4px, transparent 4px) 0 0,
+            linear-gradient(to bottom, #25D366 4px, transparent 4px) 0 0,
+            linear-gradient(to left, #25D366 4px, transparent 4px) 100% 0,
+            linear-gradient(to bottom, #25D366 4px, transparent 4px) 100% 0,
+            linear-gradient(to right, #25D366 4px, transparent 4px) 0 100%,
+            linear-gradient(to top, #25D366 4px, transparent 4px) 0 100%,
+            linear-gradient(to left, #25D366 4px, transparent 4px) 100% 100%,
+            linear-gradient(to top, #25D366 4px, transparent 4px) 100% 100%;
+        background-repeat: no-repeat;
+        background-size: 20px 20px;
     }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIN CON AVISO DE SEGURIDAD ---
+# --- 3. LOGIN CON AVISO ANIMADO ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
     st.markdown("<h1 style='text-align: center; color: #25D366;'>🚚 RUTAMASTER</h1>", unsafe_allow_html=True)
     
-    # EL AVISO AL PRINCIPIO DE LA APP
     st.markdown("""
     <div class='shield-box'>
-        <b style='color: #25D366;'>⚠️ AVISO DE SEGURIDAD</b><br>
-        <small style='color: white;'>Esta aplicación está protegida por <b>Aisaac-Shield</b>.<br>
-        El acceso no autorizado será registrado.</small>
+        <b style='color: #25D366; font-size: 1.2rem;'>⚠️ AVISO DE SEGURIDAD</b><br>
+        <span style='color: white;'>Esta aplicación está protegida por <b>Aisaac-Shield</b>.</span><br>
+        <small style='color: #25D366;'>El acceso no autorizado será registrado automáticamente.</small>
     </div>
     """, unsafe_allow_html=True)
 
@@ -152,7 +159,7 @@ with tabs[0]:
 with tabs[1]:
     if not df_f.empty:
         for i, row in df_f.iterrows():
-            st.markdown(f"<div class='gasto-card'><small>{row['fecha'].strftime('%d %b')}</small><br><b>{row['concepto']}</b><br><span style='color:#25D366;'>CRC {row['monto']:,.0f}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='gasto-card'><small>{row['fecha'].strftime('%d %b')}</small><br><b>{row['concepto']}</b><br><span style='color:#25D366; font-size:1.2rem;'>CRC {row['monto']:,.0f}</span></div>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             if row.get('foto_comprobante'):
                 with c1.popover("📷 Foto"): st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
@@ -167,17 +174,11 @@ with tabs[2]:
     
     if not df_f.empty:
         st.metric(f"TOTAL {m_sel.upper()}", f"CRC {df_f['monto'].sum():,.0f}")
-        
-        # Gráfico de Dona
         df_pie = df_f.groupby('concepto')['monto'].sum().reset_index()
-        fig = px.pie(df_pie, values='monto', names='concepto', hole=0.5, 
-                     color_discrete_sequence=px.colors.sequential.Greens_r)
+        fig = px.pie(df_pie, values='monto', names='concepto', hole=0.5, color_discrete_sequence=px.colors.sequential.Greens_r)
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', legend_font_color="#25D366", margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
-        
         st.divider()
-        
-        # Tabla de Gastos
         st.subheader("📋 Resumen del Mes")
         df_tabla = df_f[['fecha', 'concepto', 'monto']].copy()
         df_tabla['fecha'] = df_tabla['fecha'].dt.strftime('%d/%m/%Y')
@@ -185,10 +186,10 @@ with tabs[2]:
     else:
         st.info("No hay datos este mes.")
 
-    # EL SELLO DE ABAJO (También con esquinas)
+    # SELLO INFERIOR ANIMADO
     st.markdown("""
     <div class='shield-box'>
         <span style='color: #25D366; font-weight: 900; letter-spacing: 1px;'>🛡️ AISAAC-SHIELD ACTIVATED</span><br>
-        <small style='color: #A0A0A0;'>Licencia Verificada para RutaMaster</small>
+        <small style='color: #A0A0A0;'>Seguridad de datos en tiempo real</small>
     </div>
     """, unsafe_allow_html=True)
