@@ -60,21 +60,24 @@ if not st.session_state['autenticado']:
         if st.session_state['autenticado']: st.rerun()
     st.stop()
 
-# --- 4. CARGA DE DATOS Y NAVEGACIÓN ---
+# --- 4. CARGA DE DATOS Y NAVEGACIÓN DESPLEGABLE ---
 u = st.session_state['user']
 meses_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
 st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
 
-# SECCIÓN ANTI-TECLADO: Usamos segmented_control para evitar que se abra el teclado
-st.write("📅 **Seleccione el periodo:**")
-m_sel = st.segmented_control(
-    "Mes", 
-    options=meses_nombres, 
-    default=meses_nombres[datetime.now().month-1],
-    label_visibility="collapsed"
-)
+# CREAMOS EL DESPLEGABLE QUE NO ACTIVA EL TECLADO
+with st.expander(f"📅 PERIODO ACTUAL: {st.session_state.get('mes_f', meses_nombres[datetime.now().month-1])}", expanded=False):
+    m_sel = st.segmented_control(
+        "Seleccione el mes para ver los datos:", 
+        options=meses_nombres, 
+        default=meses_nombres[datetime.now().month-1],
+        label_visibility="collapsed",
+        key="mes_f" # Guardamos la elección en el estado
+    )
+    st.write("*(Toque el mes y luego cierre esta pestaña)*")
 
+# CARGA DE DATOS CENTRALIZADA
 df_f = pd.DataFrame()
 km_actual = 0
 try:
@@ -82,14 +85,14 @@ try:
     if rg.data:
         df_raw = pd.DataFrame(rg.data)
         df_raw['fecha'] = pd.to_datetime(df_raw['fecha'])
-        # Filtrado por el mes seleccionado en los botones
+        # Filtramos por el mes que el usuario tocó en el desplegable
         df_f = df_raw[df_raw['fecha'].dt.month == (meses_nombres.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
     
-    # Kilometraje actual
     rk = supabase.table("viajes").select("km_actual").eq("cliente_id", u).order("id", desc=True).limit(1).execute()
     km_actual = rk.data[0]['km_actual'] if rk.data else 0
 except: pass
 
+# --- PESTAÑAS DE TRABAJO ---
 tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
 # --- TAB 1: REGISTRO SEPARADO ---
