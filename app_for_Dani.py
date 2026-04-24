@@ -1,16 +1,19 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from supabase import create_client, Client
 import base64
 import os
 from PIL import Image
 import io
 import plotly.express as px
-import time # <--- IMPORTANTE: Nos permite pausar para ver los mensajes de éxito
+import time
 
-# --- 0. CONFIGURACIÓN ---
+# --- 0. CONFIGURACIÓN Y ZONA HORARIA ---
 st.set_page_config(page_title="RutaMaster - Dani", layout="centered")
+
+# Configuración estricta de la hora para Costa Rica (UTC -6)
+ZONA_CR = timezone(timedelta(hours=-6))
 
 @st.cache_resource
 def init_conexion():
@@ -64,13 +67,16 @@ if not st.session_state['autenticado']:
 u = st.session_state['user']
 meses_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
+# Obtenemos el mes actual pero ajustado a la hora de CR
+mes_actual_cr = datetime.now(ZONA_CR).month
+
 st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
 
-with st.expander(f"📅 PERIODO ACTUAL: {st.session_state.get('mes_f', meses_nombres[datetime.now().month-1])}", expanded=False):
+with st.expander(f"📅 PERIODO ACTUAL: {st.session_state.get('mes_f', meses_nombres[mes_actual_cr-1])}", expanded=False):
     m_sel = st.segmented_control(
         "Seleccione el mes para ver los datos:", 
         options=meses_nombres, 
-        default=meses_nombres[datetime.now().month-1],
+        default=meses_nombres[mes_actual_cr-1],
         label_visibility="collapsed",
         key="mes_f"
     )
@@ -78,17 +84,15 @@ with st.expander(f"📅 PERIODO ACTUAL: {st.session_state.get('mes_f', meses_nom
 
 # CARGA DE DATOS CENTRALIZADA
 df_f = pd.DataFrame()
-df_viajes = pd.DataFrame() # <--- Dataframe exclusivo para los viajes
+df_viajes = pd.DataFrame()
 km_actual = 0
 try:
-    # Cargar Gastos
     rg = supabase.table("gastos").select("*").eq("cliente_id", u).execute()
     if rg.data:
         df_raw = pd.DataFrame(rg.data)
         df_raw['fecha'] = pd.to_datetime(df_raw['fecha'])
         df_f = df_raw[df_raw['fecha'].dt.month == (meses_nombres.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
     
-    # Cargar Viajes
     rv = supabase.table("viajes").select("*").eq("cliente_id", u).order("id", desc=True).limit(20).execute()
     if rv.data:
         df_viajes = pd.DataFrame(rv.data)
@@ -102,10 +106,14 @@ with tabs[0]:
     opcion_registro = st.radio("SELECCIONE QUÉ DESEA REGISTRAR:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
     st.write("")
     
+    # Calculamos la fecha de hoy en Costa Rica
+    hoy_cr = datetime.now(ZONA_CR).date()
+    
     if opcion_registro == "💸 Gasto Operativo":
         with st.form("f_gasto", clear_on_submit=True):
             st.subheader("Registrar Gasto de Ruta")
-            fecha_gasto = st.date_input("📅 Fecha Inteligente", datetime.now().date())
+            # Usamos la fecha corregida de CR
+            fecha_gasto = st.date_input("📅 Fecha Inteligente", hoy_cr)
             c1, c2 = st.columns(2)
             tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
             monto = c2.number_input("Monto (CRC)", value=None, placeholder="0", step=500)
@@ -116,7 +124,7 @@ with tabs[0]:
                         f_bytes = procesar_foto(foto) if foto else None
                         supabase.table("gastos").insert({"fecha": str(fecha_gasto), "concepto": tipo, "monto": monto, "cliente_id": u, "foto_comprobante": f_bytes}).execute()
                         st.success("✅ Gasto guardado correctamente.")
-                        time.sleep(1.5) # Pausa para ver el mensaje
+                        time.sleep(1.5) 
                         st.rerun()
                     except Exception as e: st.error(f"❌ Error de base de datos: {e}")
                 else: st.warning("Ingrese un Monto.")
@@ -124,7 +132,8 @@ with tabs[0]:
     elif opcion_registro == "🛣️ Finalizar Viaje":
         with st.form("f_viaje", clear_on_submit=True):
             st.subheader("Reporte de Viaje Realizado")
-            fecha_viaje = st.date_input("📅 Fecha Inteligente", datetime.now().date())
+            # Usamos la fecha corregida de CR
+            fecha_viaje = st.date_input("📅 Fecha Inteligente", hoy_cr)
             cliente = st.text_input("👤 Cliente / Empresa")
             c3, c4 = st.columns(2)
             origen = c3.text_input("📍 Origen")
@@ -137,7 +146,6 @@ with tabs[0]:
             if st.form_submit_button("GUARDAR VIAJE"):
                 if km is not None and origen and destino:
                     try:
-                        # Se agrega un bloque try-except para mostrar el error exacto si falla
                         supabase.table("viajes").insert({
                             "fecha": str(fecha_viaje), 
                             "cliente": cliente, 
@@ -150,7 +158,7 @@ with tabs[0]:
                         }).execute()
                         st.success("✅ Viaje guardado correctamente en la nube.")
                         st.balloons()
-                        time.sleep(1.5) # Nos detenemos 1.5 segundos para que veas los globos
+                        time.sleep(1.5) 
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Error al guardar en Supabase. Detalles: {e}")
@@ -174,10 +182,8 @@ with tabs[1]:
 with tabs[2]:
     st.metric("KILOMETRAJE ACTUAL FLOTA", f"{km_actual:,} KM")
     
-    # NUEVO: Mostramos los viajes registrados para confirmación visual
     if not df_viajes.empty:
         with st.expander("📂 Ver Historial de Viajes Registrados", expanded=True):
-            # Mostramos una tabla limpia con las columnas principales
             st.dataframe(df_viajes[['fecha', 'origen', 'destino', 'km_actual', 'cliente']], hide_index=True, use_container_width=True)
 
     st.divider()
