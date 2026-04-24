@@ -40,8 +40,8 @@ st.markdown(f"""
 <style>
     [data-testid="stHeader"], .stDeployButton, footer {{ visibility: hidden; display: none !important; }}
     .stApp {{ background-color: #000 !important; {f"background-image: url(data:image/png;base64,{fondo_b64});" if fondo_b64 else ""} background-size: cover; }}
-    [data-testid="stAppViewBlockContainer"] {{ background-color: rgba(5, 5, 5, 0.95); padding: 2.5rem; border-radius: 30px; border: 1px solid #25D366; }}
-    .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border-left: 6px solid #25D366; margin-bottom: 15px; }}
+    [data-testid="stAppViewBlockContainer"] {{ background-color: rgba(5, 5, 5, 0.95); padding: 2rem; border-radius: 30px; border: 1px solid #25D366; }}
+    .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 12px; border-left: 5px solid #25D366; margin-bottom: 10px; }}
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
 </style>
@@ -63,12 +63,13 @@ if not st.session_state['autenticado']:
 # --- 4. CARGA DE DATOS ---
 u = st.session_state['user']
 meses_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-mes_actual_cr = datetime.now(ZONA_CR).month
+hoy_cr_dt = datetime.now(ZONA_CR)
+mes_actual_cr = hoy_cr_dt.month
 
 st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
 
-with st.expander(f"📅 PERIODO ACTUAL: {st.session_state.get('mes_f', meses_nombres[mes_actual_cr-1])}", expanded=False):
-    m_sel = st.segmented_control("Mes:", options=meses_nombres, default=meses_nombres[mes_actual_cr-1], label_visibility="collapsed", key="mes_f")
+with st.expander(f"📅 PERIODO: {st.session_state.get('mes_f', meses_nombres[mes_actual_cr-1])}", expanded=False):
+    m_sel = st.segmented_control("Mes:", options=meses_nombres, default=meses_nombres[mes_actual_cr-1], key="mes_f")
 
 df_f = pd.DataFrame()
 km_actual = 0
@@ -88,7 +89,7 @@ tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 # --- TAB 1: REGISTRO ---
 with tabs[0]:
     opcion = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
-    hoy_cr = datetime.now(ZONA_CR).date()
+    hoy_cr = hoy_cr_dt.date()
     
     if opcion == "💸 Gasto Operativo":
         with st.form("f_gasto", clear_on_submit=True):
@@ -100,8 +101,7 @@ with tabs[0]:
             if st.form_submit_button("GUARDAR GASTO"):
                 if monto:
                     supabase.table("gastos").insert({"fecha": str(fecha), "concepto": tipo, "monto": monto, "cliente_id": u, "foto_comprobante": procesar_foto(foto) if foto else None}).execute()
-                    st.success("✅ Guardado")
-                    time.sleep(1); st.rerun()
+                    st.success("✅ Guardado"); time.sleep(1); st.rerun()
                     
     elif opcion == "🛣️ Finalizar Viaje":
         with st.form("f_viaje", clear_on_submit=True):
@@ -116,22 +116,21 @@ with tabs[0]:
             if st.form_submit_button("GUARDAR VIAJE"):
                 if km and orig and dest:
                     supabase.table("viajes").insert({"fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, "monto": cost, "cliente_id": u, "km_actual": km}).execute()
-                    st.success("✅ Viaje Registrado")
-                    st.balloons(); time.sleep(1.5); st.rerun()
+                    st.success("✅ Viaje Registrado"); st.balloons(); time.sleep(1.5); st.rerun()
 
-# --- TAB 2: GASTOS ---
+# --- TAB 2: GASTOS (ELIMINAR) ---
 with tabs[1]:
     if not df_f.empty:
         for i, row in df_f.iterrows():
-            st.markdown(f"<div class='gasto-card'><small>{row['fecha'].strftime('%d %b')}</small><br><b>{row['concepto']}</b><br><span style='color:#25D366; font-size:1.2rem;'>CRC {row['monto']:,.0f}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='gasto-card'><small>{row['fecha'].strftime('%d %b')}</small><br><b>{row['concepto']}</b><br><span style='color:#25D366;'>CRC {row['monto']:,.0f}</span></div>", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
             if row.get('foto_comprobante'):
-                with st.popover("📷 Ver Ticket"): st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
-            if st.button("🗑️ Eliminar", key=f"d_{row['id']}"):
-                supabase.table("gastos").delete().eq("id", row['id']).execute()
-                st.rerun()
+                with c1.popover("📷 Foto"): st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
+            if c2.button("🗑️ Borrar", key=f"d_{row['id']}"):
+                supabase.table("gastos").delete().eq("id", row['id']).execute(); st.rerun()
     else: st.info("Sin gastos.")
 
-# --- TAB 3: DATOS (GRÁFICO REDONDO) ---
+# --- TAB 3: DATOS (MÉTRICAS + GRÁFICO + TABLA) ---
 with tabs[2]:
     st.metric("KILOMETRAJE ACTUAL", f"{km_actual:,} KM")
     st.divider()
@@ -139,20 +138,19 @@ with tabs[2]:
     if not df_f.empty:
         st.metric(f"TOTAL {m_sel.upper()}", f"CRC {df_f['monto'].sum():,.0f}")
         
-        # Gráfico de Pastel mejorado
+        # 1. Gráfico de Dona
         df_pie = df_f.groupby('concepto')['monto'].sum().reset_index()
-        fig = px.pie(
-            df_pie, 
-            values='monto', 
-            names='concepto', 
-            hole=0.4, # Estilo dona (más moderno)
-            color_discrete_sequence=px.colors.sequential.Greens_r
-        )
-        fig.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)', 
-            legend_font_color="#25D366",
-            margin=dict(t=0, b=0, l=0, r=0)
-        )
+        fig = px.pie(df_pie, values='monto', names='concepto', hole=0.5, 
+                     color_discrete_sequence=px.colors.sequential.Greens_r)
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', legend_font_color="#25D366", margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
+        
+        st.divider()
+        
+        # 2. Tabla de Gastos (Lo que pediste)
+        st.subheader("📋 Resumen del Mes")
+        df_tabla = df_f[['fecha', 'concepto', 'monto']].copy()
+        df_tabla['fecha'] = df_tabla['fecha'].dt.strftime('%d/%m/%Y')
+        st.dataframe(df_tabla, hide_index=True, use_container_width=True)
     else:
-        st.info("No hay datos para mostrar el gráfico este mes.")
+        st.info("No hay datos este mes.")
