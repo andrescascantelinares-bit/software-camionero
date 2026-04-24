@@ -31,7 +31,7 @@ def get_base64(file_path):
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-# --- 2. LOGIN ---
+# --- 2. LOGIN (RESTAURADO) ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
@@ -44,11 +44,10 @@ if not st.session_state['autenticado']:
         if st.session_state['autenticado']: st.rerun()
     st.stop()
 
-# --- 3. PROCESAMIENTO DE DATOS GLOBAL (FUERA DE TABS) ---
+# --- 3. DISEÑO VISUAL ---
 u = st.session_state['user']
 meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
-# Estilos CSS
 fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH"))
 st.markdown(f"""
 <style>
@@ -57,6 +56,7 @@ st.markdown(f"""
     [data-testid="stAppViewBlockContainer"] {{ background-color: rgba(5, 5, 5, 0.95); padding: 2.5rem; border-radius: 30px; border: 1px solid #25D366; }}
     .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border-left: 6px solid #25D366; margin-bottom: 15px; border-right: 1px solid rgba(37, 211, 102, 0.2); }}
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
+    .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,16 +66,13 @@ m_sel = st.selectbox("📅 Seleccione el periodo:", meses, index=datetime.now().
 # CARGA DE DATOS CENTRALIZADA
 df_f = pd.DataFrame()
 km_actual = 0
-
 try:
-    # Gastos
     rg = supabase.table("gastos").select("*").eq("cliente_id", u).execute()
     df_raw = pd.DataFrame(rg.data)
     if not df_raw.empty:
         df_raw['fecha'] = pd.to_datetime(df_raw['fecha'])
         df_f = df_raw[df_raw['fecha'].dt.month == (meses.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
     
-    # Kilometraje
     rk = supabase.table("viajes").select("km_actual").eq("cliente_id", u).order("created_at", desc=True).limit(1).execute()
     km_actual = rk.data[0]['km_actual'] if rk.data else 0
 except Exception as e:
@@ -83,23 +80,37 @@ except Exception as e:
 
 tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
-# --- TAB 1: REGISTRO ---
+# --- TAB 1: REGISTRO (CON OPCIÓN DE VIAJE INDEPENDIENTE) ---
 with tabs[0]:
-    with st.form("f_registro", clear_on_submit=True):
+    # SECCIÓN DE GASTOS
+    st.subheader("💰 Reportar Gasto")
+    with st.form("f_gasto", clear_on_submit=True):
         c1, c2 = st.columns(2)
         tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
         monto = c2.number_input("Monto (CRC)", value=None, placeholder="0", step=500)
-        km = st.number_input("Kilometraje Actual", value=None, placeholder="0", step=1)
         foto = st.file_uploader("📷 Foto Comprobante", type=['jpg', 'png', 'jpeg'])
-        if st.form_submit_button("SINCRONIZAR DATOS"):
-            if monto and km:
+        if st.form_submit_button("GUARDAR GASTO"):
+            if monto:
                 f_bytes = procesar_foto(foto) if foto else None
                 supabase.table("gastos").insert({"fecha": str(datetime.now().date()), "concepto": tipo, "monto": monto, "cliente_id": u, "foto_comprobante": f_bytes}).execute()
-                supabase.table("viajes").insert({"fecha": str(datetime.now().date()), "km_actual": km, "cliente_id": u}).execute()
-                st.success("✅ Sincronizado")
+                st.success("✅ Gasto sincronizado")
                 st.rerun()
+            else: st.warning("Ingrese el monto del gasto")
 
-# --- TAB 2: GASTOS (TARJETAS VISIBLES) ---
+    st.divider()
+
+    # SECCIÓN DE VIAJES (LO QUE HACÍA FALTA)
+    st.subheader("🛣️ Registrar Viaje")
+    with st.form("f_viaje", clear_on_submit=True):
+        km = st.number_input("Kilometraje Actual", value=None, placeholder=f"Último: {km_actual} KM", step=1)
+        if st.form_submit_button("REGISTRAR KM"):
+            if km:
+                supabase.table("viajes").insert({"fecha": str(datetime.now().date()), "km_actual": km, "cliente_id": u}).execute()
+                st.success("✅ Kilometraje actualizado")
+                st.rerun()
+            else: st.warning("Ingrese el kilometraje actual")
+
+# --- TAB 2: GASTOS ---
 with tabs[1]:
     if not df_f.empty:
         for i, row in df_f.iterrows():
@@ -120,20 +131,13 @@ with tabs[1]:
     else:
         st.info(f"No hay registros en {m_sel}")
 
-# --- TAB 3: DATOS (GRÁFICO CORREGIDO) ---
+# --- TAB 3: DATOS ---
 with tabs[2]:
     st.metric("KILOMETRAJE ACTUAL", f"{km_actual:,} KM")
     st.divider()
     if not df_f.empty:
         st.metric(f"INVERSIÓN TOTAL {m_sel.upper()}", f"CRC {df_f['monto'].sum():,.0f}")
-        
-        # Gráfico con Plotly Express
         resumen = df_f.groupby('concepto')['monto'].sum().reset_index()
-        fig = px.bar(resumen, x='concepto', y='monto', 
-                     color='monto', color_continuous_scale='Greens',
-                     labels={'monto': 'Monto', 'concepto': 'Tipo'})
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
-                          font_color="#25D366", height=350, margin=dict(l=0, r=0, t=30, b=0))
+        fig = px.bar(resumen, x='concepto', y='monto', color='monto', color_continuous_scale='Greens')
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#25D366")
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Agregue datos para generar estadísticas.")
