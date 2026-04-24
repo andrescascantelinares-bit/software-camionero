@@ -7,6 +7,7 @@ import os
 from PIL import Image
 import io
 import plotly.express as px
+import time # <--- IMPORTANTE: Nos permite pausar para ver los mensajes de éxito
 
 # --- 0. CONFIGURACIÓN ---
 st.set_page_config(page_title="RutaMaster - Dani", layout="centered")
@@ -42,7 +43,6 @@ st.markdown(f"""
     .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border-left: 6px solid #25D366; margin-bottom: 15px; border-right: 1px solid rgba(37, 211, 102, 0.2); }}
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
-    /* Ajuste para que el segmented control se vea bien en móvil */
     div[data-testid="stHorizontalBlock"] {{ overflow-x: auto; }}
 </style>
 """, unsafe_allow_html=True)
@@ -66,33 +66,35 @@ meses_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
 
 st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
 
-# CREAMOS EL DESPLEGABLE QUE NO ACTIVA EL TECLADO
-with st.expander(f" {st.session_state.get('mes_f', meses_nombres[datetime.now().month-1])}", expanded=False):
+with st.expander(f"📅 PERIODO ACTUAL: {st.session_state.get('mes_f', meses_nombres[datetime.now().month-1])}", expanded=False):
     m_sel = st.segmented_control(
         "Seleccione el mes para ver los datos:", 
         options=meses_nombres, 
         default=meses_nombres[datetime.now().month-1],
         label_visibility="collapsed",
-        key="mes_f" # Guardamos la elección en el estado
+        key="mes_f"
     )
-    st.write("*(Gracias por trabajar con nosotros )*")
+    st.write("*(Toque el mes y luego cierre esta pestaña)*")
 
 # CARGA DE DATOS CENTRALIZADA
 df_f = pd.DataFrame()
+df_viajes = pd.DataFrame() # <--- Dataframe exclusivo para los viajes
 km_actual = 0
 try:
+    # Cargar Gastos
     rg = supabase.table("gastos").select("*").eq("cliente_id", u).execute()
     if rg.data:
         df_raw = pd.DataFrame(rg.data)
         df_raw['fecha'] = pd.to_datetime(df_raw['fecha'])
-        # Filtramos por el mes que el usuario tocó en el desplegable
         df_f = df_raw[df_raw['fecha'].dt.month == (meses_nombres.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
     
-    rk = supabase.table("viajes").select("km_actual").eq("cliente_id", u).order("id", desc=True).limit(1).execute()
-    km_actual = rk.data[0]['km_actual'] if rk.data else 0
+    # Cargar Viajes
+    rv = supabase.table("viajes").select("*").eq("cliente_id", u).order("id", desc=True).limit(20).execute()
+    if rv.data:
+        df_viajes = pd.DataFrame(rv.data)
+        km_actual = df_viajes.iloc[0]['km_actual']
 except: pass
 
-# --- PESTAÑAS DE TRABAJO ---
 tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
 # --- TAB 1: REGISTRO SEPARADO ---
@@ -110,10 +112,13 @@ with tabs[0]:
             foto = st.file_uploader("📁 Buscar imagen en galería", type=['jpg', 'png', 'jpeg'])
             if st.form_submit_button("GUARDAR GASTO"):
                 if monto:
-                    f_bytes = procesar_foto(foto) if foto else None
-                    supabase.table("gastos").insert({"fecha": str(fecha_gasto), "concepto": tipo, "monto": monto, "cliente_id": u, "foto_comprobante": f_bytes}).execute()
-                    st.success("✅ Gasto guardado")
-                    st.rerun()
+                    try:
+                        f_bytes = procesar_foto(foto) if foto else None
+                        supabase.table("gastos").insert({"fecha": str(fecha_gasto), "concepto": tipo, "monto": monto, "cliente_id": u, "foto_comprobante": f_bytes}).execute()
+                        st.success("✅ Gasto guardado correctamente.")
+                        time.sleep(1.5) # Pausa para ver el mensaje
+                        st.rerun()
+                    except Exception as e: st.error(f"❌ Error de base de datos: {e}")
                 else: st.warning("Ingrese un Monto.")
                     
     elif opcion_registro == "🛣️ Finalizar Viaje":
@@ -128,12 +133,27 @@ with tabs[0]:
             costo_viaje = c5.number_input("💰 Costo (CRC)", value=None, step=500)
             km = c6.number_input("🚗 KM Actual", value=None, placeholder=f"Último: {km_actual}", step=1)
             notas = st.text_area("📝 Notas")
+            
             if st.form_submit_button("GUARDAR VIAJE"):
-                if km and origen and destino:
-                    supabase.table("viajes").insert({"fecha": str(fecha_viaje), "cliente": cliente, "origen": origen, "destino": destino, "monto": costo_viaje, "notas": notas, "cliente_id": u, "km_actual": km}).execute()
-                    st.success("✅ Viaje guardado")
-                    st.balloons()
-                    st.rerun()
+                if km is not None and origen and destino:
+                    try:
+                        # Se agrega un bloque try-except para mostrar el error exacto si falla
+                        supabase.table("viajes").insert({
+                            "fecha": str(fecha_viaje), 
+                            "cliente": cliente, 
+                            "origen": origen, 
+                            "destino": destino, 
+                            "monto": costo_viaje, 
+                            "notas": notas, 
+                            "cliente_id": u, 
+                            "km_actual": km
+                        }).execute()
+                        st.success("✅ Viaje guardado correctamente en la nube.")
+                        st.balloons()
+                        time.sleep(1.5) # Nos detenemos 1.5 segundos para que veas los globos
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al guardar en Supabase. Detalles: {e}")
                 else: st.warning("Complete Origen, Destino y KM.")
 
 # --- TAB 2: GASTOS ---
@@ -150,9 +170,18 @@ with tabs[1]:
                 st.rerun()
     else: st.info(f"No hay gastos en {m_sel}")
 
-# --- TAB 3: DATOS ---
+# --- TAB 3: DATOS Y VIAJES ---
 with tabs[2]:
     st.metric("KILOMETRAJE ACTUAL FLOTA", f"{km_actual:,} KM")
+    
+    # NUEVO: Mostramos los viajes registrados para confirmación visual
+    if not df_viajes.empty:
+        with st.expander("📂 Ver Historial de Viajes Registrados", expanded=True):
+            # Mostramos una tabla limpia con las columnas principales
+            st.dataframe(df_viajes[['fecha', 'origen', 'destino', 'km_actual', 'cliente']], hide_index=True, use_container_width=True)
+
+    st.divider()
+    
     if not df_f.empty:
         st.metric(f"INVERSIÓN TOTAL {m_sel.upper()}", f"CRC {df_f['monto'].sum():,.0f}")
         fig = px.bar(df_f.groupby('concepto')['monto'].sum().reset_index(), x='concepto', y='monto', color='monto', color_continuous_scale='Greens')
