@@ -1,6 +1,8 @@
 streamlit
-pandas
-plotly
 supabase
-Pillow
+pandas
 fpdf
+Pillow
+plotly
+
+
