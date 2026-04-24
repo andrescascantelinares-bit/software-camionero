@@ -33,9 +33,8 @@ def get_base64(file_path):
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-# --- 2. DISEÑO VISUAL CON LUCES DE NEÓN ---
-fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH") if "APP_BACKGROUND_PATH" in st.secrets else None)
-
+# --- 2. DISEÑO VISUAL (Aisaac-Shield Neon) ---
+fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH"))
 st.markdown(f"""
 <style>
     [data-testid="stHeader"], .stDeployButton, footer {{ visibility: hidden; display: none !important; }}
@@ -44,103 +43,106 @@ st.markdown(f"""
     .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 12px; border-left: 5px solid #25D366; margin-bottom: 10px; }}
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
-    
-    /* EFECTO DE LUCES ANIMADAS AISAAC-SHIELD */
-    @keyframes neon-glow {{
-        0% {{ border-color: rgba(37, 211, 102, 0.3); box-shadow: 0 0 5px rgba(37, 211, 102, 0.2); }}
-        50% {{ border-color: rgba(37, 211, 102, 1); box-shadow: 0 0 20px rgba(37, 211, 102, 0.6); }}
-        100% {{ border-color: rgba(37, 211, 102, 0.3); box-shadow: 0 0 5px rgba(37, 211, 102, 0.2); }}
-    }}
-    .shield-box {{ 
-        margin: 20px 0; padding: 20px; text-align: center; 
-        background-color: rgba(37, 211, 102, 0.05);
-        border: 2px solid #25D366; animation: neon-glow 2s infinite ease-in-out;
-        background: linear-gradient(to right, #25D366 4px, transparent 4px) 0 0, linear-gradient(to bottom, #25D366 4px, transparent 4px) 0 0, linear-gradient(to left, #25D366 4px, transparent 4px) 100% 0, linear-gradient(to bottom, #25D366 4px, transparent 4px) 100% 0, linear-gradient(to right, #25D366 4px, transparent 4px) 0 100%, linear-gradient(to top, #25D366 4px, transparent 4px) 0 100%, linear-gradient(to left, #25D366 4px, transparent 4px) 100% 100%, linear-gradient(to top, #25D366 4px, transparent 4px) 100% 100%;
-        background-repeat: no-repeat; background-size: 20px 20px;
-    }}
+    @keyframes neon-glow {{ 0% {{ border-color: rgba(37, 211, 102, 0.3); }} 50% {{ border-color: rgba(37, 211, 102, 1); box-shadow: 0 0 15px rgba(37, 211, 102, 0.5); }} 100% {{ border-color: rgba(37, 211, 102, 0.3); }} }}
+    .shield-box {{ margin: 20px 0; padding: 20px; text-align: center; border: 2px solid #25D366; animation: neon-glow 2s infinite; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIN CON AVISO ---
+# --- 3. LOGIN ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 if not st.session_state['autenticado']:
-    st.markdown("<h1 style='text-align: center; color: #25D366;'>🚚 RUTAMASTER</h1>", unsafe_allow_html=True)
-    st.markdown("""<div class='shield-box'><b style='color: #25D366;'>⚠️ AVISO DE SEGURIDAD</b><br><small style='color: white;'>Esta aplicación está protegida por <b>Aisaac-Shield</b>.</small></div>""", unsafe_allow_html=True)
-    pin = st.text_input("PIN DE ACCESO", type="password", placeholder="****")
+    st.markdown("<h1 style='text-align: center;'>🚚 RUTAMASTER</h1>", unsafe_allow_html=True)
+    st.markdown("""<div class='shield-box'><b style='color: #25D366;'>🛡️ AISAAC-SHIELD ACTIVATED</b><br><small style='color: white;'>Acceso restringido</small></div>""", unsafe_allow_html=True)
+    pin = st.text_input("PIN", type="password")
     if st.button("ENTRAR"):
-        if pin == "8715": st.session_state.update({'autenticado': True, 'user': "Dany"})
-        elif pin == "8742": st.session_state.update({'autenticado': True, 'user': "Padre_Andres"})
-        else: st.error("PIN Incorrecto")
+        if pin == "8715": st.session_state.update({'autenticado': True, 'user': "dany"})
+        elif pin == "8742": st.session_state.update({'autenticado': True, 'user': "padre_andres"})
         if st.session_state['autenticado']: st.rerun()
     st.stop()
 
-# --- 4. CARGA DE DATOS ---
+# --- 4. DATA ENGINE (CORRECCIÓN DE REFLEJO) ---
 u = st.session_state['user']
-meses_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-hoy_cr_dt = datetime.now(ZONA_CR)
-st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
-with st.expander(f"📅 PERIODO: {st.session_state.get('mes_f', meses_nombres[hoy_cr_dt.month-1])}"):
-    m_sel = st.segmented_control("Mes:", options=meses_nombres, default=meses_nombres[hoy_cr_dt.month-1], key="mes_f")
+hoy_cr = datetime.now(ZONA_CR)
+meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.upper()}</h2>", unsafe_allow_html=True)
+
+# Selector de periodo optimizado
+with st.expander(f"📅 PERIODO: {st.session_state.get('m_sel', meses[hoy_cr.month-1])}"):
+    m_sel = st.segmented_control("Mes", options=meses, default=meses[hoy_cr.month-1], key="m_sel")
 
 df_f = pd.DataFrame()
 km_actual = 0
+
+# Carga forzada de datos (Refresco inmediato)
 try:
+    # Traer todos los gastos del usuario actual
     rg = supabase.table("gastos").select("*").eq("cliente_id", u).execute()
     if rg.data:
         df_raw = pd.DataFrame(rg.data)
         df_raw['fecha'] = pd.to_datetime(df_raw['fecha'])
-        df_f = df_raw[df_raw['fecha'].dt.month == (meses_nombres.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
+        # Filtro estricto por mes seleccionado
+        df_f = df_raw[df_raw['fecha'].dt.month == (meses.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
+    
+    # Traer último kilometraje
     rv = supabase.table("viajes").select("km_actual").eq("cliente_id", u).order("id", desc=True).limit(1).execute()
     km_actual = rv.data[0]['km_actual'] if rv.data else 0
 except: pass
 
 tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
-# --- TAB 1: REGISTRO (ARREGLO DE ERROR BIGINT) ---
+# --- TAB 1: REGISTRO (CONVERSIÓN DE TIPOS) ---
 with tabs[0]:
-    opcion = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
-    if opcion == "💸 Gasto Operativo":
-        with st.form("f_gasto", clear_on_submit=True):
-            fecha = st.date_input("Fecha", hoy_cr_dt.date())
+    op = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
+    if op == "💸 Gasto Operativo":
+        with st.form("f_g", clear_on_submit=True):
+            f = st.date_input("Fecha", hoy_cr.date())
             c1, c2 = st.columns(2)
-            tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
+            tipo = c1.selectbox("Tipo", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
             monto = c2.number_input("Monto (CRC)", value=None, step=500)
-            foto = st.file_uploader("Foto", type=['jpg', 'png', 'jpeg'])
+            foto = st.file_uploader("Ticket", type=['jpg', 'jpeg', 'png'])
             if st.form_submit_button("GUARDAR GASTO"):
                 if monto:
-                    supabase.table("gastos").insert({"fecha": str(fecha), "concepto": tipo, "monto": int(monto), "cliente_id": u, "foto_comprobante": procesar_foto(foto) if foto else None}).execute()
-                    st.success("✅ Guardado"); time.sleep(1); st.rerun()
-    elif opcion == "🛣️ Finalizar Viaje":
-        with st.form("f_viaje", clear_on_submit=True):
-            fecha = st.date_input("Fecha", hoy_cr_dt.date())
+                    supabase.table("gastos").insert({
+                        "fecha": str(f), "concepto": tipo, "monto": int(monto), 
+                        "cliente_id": u, "foto_comprobante": procesar_foto(foto) if foto else None
+                    }).execute()
+                    st.success("✅ Gasto reflejado en la nube")
+                    time.sleep(1); st.rerun()
+    else:
+        with st.form("f_v", clear_on_submit=True):
+            f = st.date_input("Fecha", hoy_cr.date())
             cli = st.text_input("Cliente")
-            c1, c2 = st.columns(2); orig = c1.text_input("Origen"); dest = c2.text_input("Destino")
+            c1, c2 = st.columns(2); o = c1.text_input("Origen"); d = c2.text_input("Destino")
             c3, c4 = st.columns(2)
-            cost = c3.number_input("Costo (CRC)", value=None)
-            km = c4.number_input("KM Actual", value=None, placeholder=f"Llevas: {km_actual}")
-            if st.form_submit_button("GUARDAR VIAJE"):
-                if km and orig and dest:
-                    try:
-                        # Forzamos int() para evitar el error de la captura
-                        supabase.table("viajes").insert({"fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)}).execute()
-                        st.success("✅ Viaje Registrado"); st.balloons(); time.sleep(1.5); st.rerun()
-                    except Exception as e: st.error(f"Error: {e}")
+            cost = c3.number_input("Costo Viaje", value=None)
+            km = c4.number_input("KM Llegada", value=None, placeholder=f"Último: {km_actual}")
+            if st.form_submit_button("FINALIZAR VIAJE"):
+                if km and o and d:
+                    # Guardado con tipos de datos limpios para evitar errores de API
+                    supabase.table("viajes").insert({
+                        "fecha": str(f), "cliente": cli, "origen": o, "destino": d, 
+                        "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)
+                    }).execute()
+                    st.success("✅ Viaje guardado correctamente")
+                    st.balloons(); time.sleep(1.5); st.rerun()
 
-# --- TAB 2 Y 3: VISUALIZACIÓN ---
+# --- TAB 2 Y 3 (Visualización Directa) ---
 with tabs[1]:
     if not df_f.empty:
         for i, row in df_f.iterrows():
-            st.markdown(f"<div class='gasto-card'><small>{row['fecha'].strftime('%d %b')}</small><br><b>{row['concepto']}</b><br><span style='color:#25D366;'>CRC {row['monto']:,.0f}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='gasto-card'><small>{row['fecha'].strftime('%d/%m/%Y')}</small><br><b>{row['concepto']}</b><br><span style='color:#25D366;'>CRC {row['monto']:,.0f}</span></div>", unsafe_allow_html=True)
             if row.get('foto_comprobante'):
-                with st.popover("📷 Foto"): st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
-            if st.button("🗑️ Borrar", key=f"d_{row['id']}"):
+                with st.popover("📷 Ver"): st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
+            if st.button("🗑️", key=f"del_{row['id']}"):
                 supabase.table("gastos").delete().eq("id", row['id']).execute(); st.rerun()
+    else: st.info(f"Sin registros en {m_sel}")
 
 with tabs[2]:
-    st.metric("KILOMETRAJE ACTUAL", f"{km_actual:,} KM")
+    st.metric("KILOMETRAJE ACTUAL FLOTA", f"{km_actual:,} KM")
     if not df_f.empty:
         st.metric(f"TOTAL {m_sel.upper()}", f"CRC {df_f['monto'].sum():,.0f}")
         fig = px.pie(df_f.groupby('concepto')['monto'].sum().reset_index(), values='monto', names='concepto', hole=0.5, color_discrete_sequence=px.colors.sequential.Greens_r)
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', legend_font_color="#25D366", margin=dict(t=10, b=10, l=10, r=10))
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', legend_font_color="#25D366", margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig, use_container_width=True)
-    st.markdown("""<div class='shield-box'><span style='color: #25D366; font-weight: 900;'>🛡️ AISAAC-SHIELD ACTIVATED</span><br><small style='color: #A0A0A0;'>Protección de datos verificada</small></div>""", unsafe_allow_html=True)
+    st.markdown("""<div class='shield-box'><span style='color: #25D366; font-weight: 900;'>🛡️ AISAAC-SHIELD ACTIVATED</span></div>""", unsafe_allow_html=True)
