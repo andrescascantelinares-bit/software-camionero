@@ -45,12 +45,11 @@ st.markdown(f"""
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
     
-    /* BORDES DECORATIVOS TECNOLÓGICOS PARA AISAAC-SHIELD */
+    /* ESTILO PARA LOS LETREROS DE AISAAC-SHIELD */
     .shield-box {{ 
-        margin-top: 30px; 
-        padding: 20px; 
+        margin: 20px 0; 
+        padding: 15px; 
         text-align: center; 
-        /* Truco CSS para las 4 esquinas marcadas */
         background: 
             linear-gradient(to right, #25D366 3px, transparent 3px) 0 0,
             linear-gradient(to bottom, #25D366 3px, transparent 3px) 0 0,
@@ -61,19 +60,28 @@ st.markdown(f"""
             linear-gradient(to left, #25D366 3px, transparent 3px) 100% 100%,
             linear-gradient(to top, #25D366 3px, transparent 3px) 100% 100%;
         background-repeat: no-repeat;
-        background-size: 20px 20px;
+        background-size: 15px 15px;
         background-color: rgba(37, 211, 102, 0.05);
         border: 1px solid rgba(37, 211, 102, 0.1);
-        box-shadow: inset 0 0 20px rgba(37, 211, 102, 0.05);
     }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIN ---
+# --- 3. LOGIN CON AVISO DE SEGURIDAD ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
     st.markdown("<h1 style='text-align: center; color: #25D366;'>🚚 RUTAMASTER</h1>", unsafe_allow_html=True)
+    
+    # EL AVISO AL PRINCIPIO DE LA APP
+    st.markdown("""
+    <div class='shield-box'>
+        <b style='color: #25D366;'>⚠️ AVISO DE SEGURIDAD</b><br>
+        <small style='color: white;'>Esta aplicación está protegida por <b>Aisaac-Shield</b>.<br>
+        El acceso no autorizado será registrado.</small>
+    </div>
+    """, unsafe_allow_html=True)
+
     pin = st.text_input("PIN DE ACCESO", type="password", placeholder="****")
     if st.button("ENTRAR"):
         if pin == "8715": st.session_state.update({'autenticado': True, 'user': "Dany"})
@@ -177,10 +185,10 @@ with tabs[2]:
     else:
         st.info("No hay datos este mes.")
 
-    # EL LETRERO DE SEGURIDAD (Siempre visible al final)
+    # EL SELLO DE ABAJO (También con esquinas)
     st.markdown("""
     <div class='shield-box'>
-        <span style='color: #25D366; font-weight: 900; font-size: 1.1rem; letter-spacing: 1px;'>🛡️ AISAAC-SHIELD ACTIVATED</span><br>
-        <small style='color: #A0A0A0;'>Sistema con Protección de Datos Verificada</small>
+        <span style='color: #25D366; font-weight: 900; letter-spacing: 1px;'>🛡️ AISAAC-SHIELD ACTIVATED</span><br>
+        <small style='color: #A0A0A0;'>Licencia Verificada para RutaMaster</small>
     </div>
     """, unsafe_allow_html=True)
