@@ -31,7 +31,7 @@ def get_base64(file_path):
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-# --- 2. DISEÑO VISUAL GLOBAL (Movido aquí para arreglar el Login blanco) ---
+# --- 2. DISEÑO VISUAL GLOBAL ---
 fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH") if "APP_BACKGROUND_PATH" in st.secrets else None)
 
 st.markdown(f"""
@@ -42,10 +42,12 @@ st.markdown(f"""
     .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border-left: 6px solid #25D366; margin-bottom: 15px; border-right: 1px solid rgba(37, 211, 102, 0.2); }}
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
+    /* Ajuste para el selector de tipo de registro */
+    div[data-testid="stRadio"] > div {{ flex-direction: row; gap: 15px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 15px; justify-content: center; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIN (RESTAURADO) ---
+# --- 3. LOGIN ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
@@ -58,7 +60,7 @@ if not st.session_state['autenticado']:
         if st.session_state['autenticado']: st.rerun()
     st.stop()
 
-# --- 4. CARGA DE DATOS CENTRALIZADA ---
+# --- 4. CARGA DE DATOS ---
 u = st.session_state['user']
 meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
@@ -69,49 +71,100 @@ df_f = pd.DataFrame()
 km_actual = 0
 try:
     rg = supabase.table("gastos").select("*").eq("cliente_id", u).execute()
-    df_raw = pd.DataFrame(rg.data)
-    if not df_raw.empty:
+    if rg.data:
+        df_raw = pd.DataFrame(rg.data)
         df_raw['fecha'] = pd.to_datetime(df_raw['fecha'])
         df_f = df_raw[df_raw['fecha'].dt.month == (meses.index(m_sel)+1)].sort_values(by='fecha', ascending=False)
     
-    rk = supabase.table("viajes").select("km_actual").eq("cliente_id", u).order("created_at", desc=True).limit(1).execute()
+    # Intenta traer el km_actual
+    try:
+        rk = supabase.table("viajes").select("km_actual").eq("cliente_id", u).order("created_at", desc=True).limit(1).execute()
+    except:
+        rk = supabase.table("viajes").select("km_actual").eq("cliente_id", u).order("id", desc=True).limit(1).execute()
     km_actual = rk.data[0]['km_actual'] if rk.data else 0
 except Exception as e:
-    st.error(f"Error de conexión: {e}")
+    pass
 
 tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
-# --- TAB 1: REGISTRO UNIFICADO ---
+# --- TAB 1: REGISTRO SEPARADO (GASTOS Y VIAJES) ---
 with tabs[0]:
-    st.subheader("📝 Reportar Movimiento")
-    with st.form("f_registro", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros", "Viaje (Solo KM)"])
-        monto = c2.number_input("Monto (CRC)", value=None, placeholder="Opcional", step=500)
-        
-        # El campo de Kilometraje vuelve a estar aquí mismo
-        km = st.number_input("Kilometraje Actual", value=None, placeholder=f"Último: {km_actual} KM", step=1)
-        foto = st.file_uploader("📷 Foto Comprobante", type=['jpg', 'png', 'jpeg'])
-        
-        if st.form_submit_button("GUARDAR REGISTRO"):
-            if monto or km:
-                try:
-                    # Guardar Gasto si hay monto
-                    if monto:
+    opcion_registro = st.radio("SELECCIONE QUÉ DESEA REGISTRAR:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
+    st.write("") # Espacio
+    
+    # ==========================================
+    # FORMULARIO 1: GASTOS OPERATIVOS
+    # ==========================================
+    if opcion_registro == "💸 Gasto Operativo":
+        with st.form("f_gasto", clear_on_submit=True):
+            st.subheader("Registrar Gasto de Ruta")
+            fecha_gasto = st.date_input("📅 Fecha Inteligente", datetime.now().date())
+            
+            c1, c2 = st.columns(2)
+            tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
+            monto = c2.number_input("Monto (CRC)", value=None, placeholder="0", step=500)
+            
+            # Texto modificado para indicar que busque en galería
+            foto = st.file_uploader("📁 Buscar imagen en el dispositivo (Galería)", type=['jpg', 'png', 'jpeg'])
+            
+            if st.form_submit_button("GUARDAR GASTO"):
+                if monto:
+                    try:
                         f_bytes = procesar_foto(foto) if foto else None
-                        supabase.table("gastos").insert({"fecha": str(datetime.now().date()), "concepto": tipo, "monto": monto, "cliente_id": u, "foto_comprobante": f_bytes}).execute()
+                        supabase.table("gastos").insert({
+                            "fecha": str(fecha_gasto), 
+                            "concepto": tipo, 
+                            "monto": monto, 
+                            "cliente_id": u, 
+                            "foto_comprobante": f_bytes
+                        }).execute()
+                        st.success("✅ Gasto guardado con éxito")
+                        st.rerun()
+                    except Exception as e: st.error(f"Error: {e}")
+                else: 
+                    st.warning("⚠️ Debe ingresar un Monto.")
                     
-                    # Guardar Viaje si hay KM
-                    if km:
-                        supabase.table("viajes").insert({"fecha": str(datetime.now().date()), "km_actual": km, "cliente_id": u}).execute()
-                        
-                    st.success("✅ Registro guardado con éxito")
-                    st.balloons()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al guardar: {e}")
-            else: 
-                st.warning("⚠️ Debe ingresar un Monto o el Kilometraje para guardar.")
+    # ==========================================
+    # FORMULARIO 2: VIAJES COMPLETOS
+    # ==========================================
+    elif opcion_registro == "🛣️ Finalizar Viaje":
+        with st.form("f_viaje", clear_on_submit=True):
+            st.subheader("Reporte de Viaje Realizado")
+            fecha_viaje = st.date_input("📅 Fecha Inteligente", datetime.now().date())
+            
+            cliente = st.text_input("👤 Cliente / Empresa")
+            
+            c3, c4 = st.columns(2)
+            origen = c3.text_input("📍 Origen (Ej: Zabana)")
+            destino = c4.text_input("🏁 Destino (Ej: Los Guido)")
+            
+            c5, c6 = st.columns(2)
+            costo_viaje = c5.number_input("💰 Costo del Viaje (CRC)", value=None, step=500)
+            km = c6.number_input("🚗 Kilometraje Actual", value=None, placeholder=f"Último: {km_actual} KM", step=1)
+            
+            notas = st.text_area("📝 Notas / Observaciones del Viaje")
+            
+            if st.form_submit_button("GUARDAR VIAJE"):
+                if km and origen and destino:
+                    try:
+                        # Mapeado exacto a las columnas de tu imagen de Supabase
+                        supabase.table("viajes").insert({
+                            "fecha": str(fecha_viaje), 
+                            "cliente": cliente, 
+                            "origen": origen, 
+                            "destino": destino, 
+                            "monto": costo_viaje, 
+                            "notas": notas, 
+                            "cliente_id": u, 
+                            "km_actual": km
+                        }).execute()
+                        st.success("✅ Viaje guardado correctamente en la Base de Datos")
+                        st.balloons()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar: {e}")
+                else:
+                    st.warning("⚠️ Por favor complete el Origen, Destino y Kilometraje.")
 
 # --- TAB 2: GASTOS ---
 with tabs[1]:
@@ -132,11 +185,11 @@ with tabs[1]:
                 supabase.table("gastos").delete().eq("id", row['id']).execute()
                 st.rerun()
     else:
-        st.info(f"No hay registros en {m_sel}")
+        st.info(f"No hay gastos registrados en {m_sel}")
 
 # --- TAB 3: DATOS ---
 with tabs[2]:
-    st.metric("KILOMETRAJE ACTUAL", f"{km_actual:,} KM")
+    st.metric("KILOMETRAJE ACTUAL FLOTA", f"{km_actual:,} KM")
     st.divider()
     if not df_f.empty:
         st.metric(f"INVERSIÓN TOTAL {m_sel.upper()}", f"CRC {df_f['monto'].sum():,.0f}")
