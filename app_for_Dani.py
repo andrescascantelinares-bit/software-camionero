@@ -105,7 +105,7 @@ mes_actual_cr = hoy_cr_dt.month
 
 st.markdown(f"<h2 style='text-align: center;'>🚚 RUTAMASTER - {u.replace('_', ' ')}</h2>", unsafe_allow_html=True)
 
-with st.expander(f"📅 PERIODO: {st.session_state.get('mes_f', meses_nombres[mes_actual_cr-1])}", expanded=False):
+with st.expander(f": {st.session_state.get('mes_f', meses_nombres[mes_actual_cr-1])}", expanded=False):
     m_sel = st.segmented_control("Mes:", options=meses_nombres, default=meses_nombres[mes_actual_cr-1], key="mes_f")
 
 df_f = pd.DataFrame()
