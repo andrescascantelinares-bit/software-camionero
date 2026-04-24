@@ -75,7 +75,7 @@ with st.expander(f" {st.session_state.get('mes_f', meses_nombres[datetime.now().
         label_visibility="collapsed",
         key="mes_f" # Guardamos la elección en el estado
     )
-    st.write("*(Toque el mes y luego cierre esta pestaña)*")
+    st.write("*(Gracias por trabajar con nosotros )*")
 
 # CARGA DE DATOS CENTRALIZADA
 df_f = pd.DataFrame()
