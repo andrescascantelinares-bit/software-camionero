@@ -89,7 +89,7 @@ with tabs[0]:
                 except: st.error("Error al guardar.")
 
 # --- PESTAÑA 2: GASTOS ---
-# --- PESTAÑA 2: GASTOS (Administración y Visualización) ---
+
 with tabs[1]:
     st.subheader(f"Lista de Gastos - {m_sel}")
     
@@ -115,13 +115,18 @@ with tabs[1]:
                     fecha_str = row['fecha'].strftime('%d/%m')
                     c1.write(f"📅 {fecha_str} | **{row['concepto']}** | `CRC {row['monto']:,.0f}`")
                     
-                    # Botón para ver la foto si existe
+                    # --- NUEVO VISOR DE FOTO CERRABLE ---
+                    # Verificamos si existe la foto
                     if row.get('foto_comprobante'):
-                        if c2.button("📷 Ver", key=f"img_{row['id']}"):
+                        # Usamos popover para crear la ventana flotante cerrable
+                        with c2.popover("📷 Ver", use_container_width=True):
                             st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}", use_column_width=True)
+                            st.write("*(Toque fuera de la foto para cerrar)*")
+                    else:
+                        c2.write("🚫") # Icono si no hay foto
                     
                     # Botón para borrar el registro
-                    if c3.button("🗑️ Borrar", key=f"del_{row['id']}"):
+                    if c3.button("🗑️", key=f"del_{row['id']}"):
                         supabase.table("gastos").delete().eq("id", row['id']).execute()
                         st.success("Registro eliminado.")
                         st.rerun()
@@ -132,7 +137,7 @@ with tabs[1]:
             
     except Exception as e:
         st.error(f"❌ Error de conexión con Supabase: {e}")
-        
+
 # --- PESTAÑA 3: DATOS ---
 with tabs[2]:
     st.subheader("Análisis de Operación")
