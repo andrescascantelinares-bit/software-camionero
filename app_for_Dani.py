@@ -44,7 +44,28 @@ st.markdown(f"""
     .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 12px; border-left: 5px solid #25D366; margin-bottom: 10px; }}
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
-    .shield-box {{ border: 1px solid #25D366; padding: 10px; border-radius: 10px; text-align: center; background: rgba(37, 211, 102, 0.1); margin-top: 20px; }}
+    
+    /* BORDES DECORATIVOS TECNOLÓGICOS PARA AISAAC-SHIELD */
+    .shield-box {{ 
+        margin-top: 30px; 
+        padding: 20px; 
+        text-align: center; 
+        /* Truco CSS para las 4 esquinas marcadas */
+        background: 
+            linear-gradient(to right, #25D366 3px, transparent 3px) 0 0,
+            linear-gradient(to bottom, #25D366 3px, transparent 3px) 0 0,
+            linear-gradient(to left, #25D366 3px, transparent 3px) 100% 0,
+            linear-gradient(to bottom, #25D366 3px, transparent 3px) 100% 0,
+            linear-gradient(to right, #25D366 3px, transparent 3px) 0 100%,
+            linear-gradient(to top, #25D366 3px, transparent 3px) 0 100%,
+            linear-gradient(to left, #25D366 3px, transparent 3px) 100% 100%,
+            linear-gradient(to top, #25D366 3px, transparent 3px) 100% 100%;
+        background-repeat: no-repeat;
+        background-size: 20px 20px;
+        background-color: rgba(37, 211, 102, 0.05);
+        border: 1px solid rgba(37, 211, 102, 0.1);
+        box-shadow: inset 0 0 20px rgba(37, 211, 102, 0.05);
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -146,14 +167,6 @@ with tabs[2]:
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', legend_font_color="#25D366", margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
         
-        # EL LETRERO DE SEGURIDAD (Aisaac-Shield)
-        st.markdown("""
-        <div class='shield-box'>
-            <span style='color: #25D366; font-weight: bold;'>🛡️ AISAAC-SHIELD ACTIVATED</span><br>
-            <small style='color: white;'>Protección de Datos y Licencia Verificada</small>
-        </div>
-        """, unsafe_allow_html=True)
-        
         st.divider()
         
         # Tabla de Gastos
@@ -163,3 +176,11 @@ with tabs[2]:
         st.dataframe(df_tabla, hide_index=True, use_container_width=True)
     else:
         st.info("No hay datos este mes.")
+
+    # EL LETRERO DE SEGURIDAD (Siempre visible al final)
+    st.markdown("""
+    <div class='shield-box'>
+        <span style='color: #25D366; font-weight: 900; font-size: 1.1rem; letter-spacing: 1px;'>🛡️ AISAAC-SHIELD ACTIVATED</span><br>
+        <small style='color: #A0A0A0;'>Sistema con Protección de Datos Verificada</small>
+    </div>
+    """, unsafe_allow_html=True)
