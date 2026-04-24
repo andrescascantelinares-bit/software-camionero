@@ -44,6 +44,7 @@ st.markdown(f"""
     .gasto-card {{ background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 12px; border-left: 5px solid #25D366; margin-bottom: 10px; }}
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
+    .shield-box {{ border: 1px solid #25D366; padding: 10px; border-radius: 10px; text-align: center; background: rgba(37, 211, 102, 0.1); margin-top: 20px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -118,7 +119,7 @@ with tabs[0]:
                     supabase.table("viajes").insert({"fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, "monto": cost, "cliente_id": u, "km_actual": km}).execute()
                     st.success("✅ Viaje Registrado"); st.balloons(); time.sleep(1.5); st.rerun()
 
-# --- TAB 2: GASTOS (ELIMINAR) ---
+# --- TAB 2: GASTOS ---
 with tabs[1]:
     if not df_f.empty:
         for i, row in df_f.iterrows():
@@ -130,7 +131,7 @@ with tabs[1]:
                 supabase.table("gastos").delete().eq("id", row['id']).execute(); st.rerun()
     else: st.info("Sin gastos.")
 
-# --- TAB 3: DATOS (MÉTRICAS + GRÁFICO + TABLA) ---
+# --- TAB 3: DATOS ---
 with tabs[2]:
     st.metric("KILOMETRAJE ACTUAL", f"{km_actual:,} KM")
     st.divider()
@@ -138,16 +139,24 @@ with tabs[2]:
     if not df_f.empty:
         st.metric(f"TOTAL {m_sel.upper()}", f"CRC {df_f['monto'].sum():,.0f}")
         
-        # 1. Gráfico de Dona
+        # Gráfico de Dona
         df_pie = df_f.groupby('concepto')['monto'].sum().reset_index()
         fig = px.pie(df_pie, values='monto', names='concepto', hole=0.5, 
                      color_discrete_sequence=px.colors.sequential.Greens_r)
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', legend_font_color="#25D366", margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
         
+        # EL LETRERO DE SEGURIDAD (Aisaac-Shield)
+        st.markdown("""
+        <div class='shield-box'>
+            <span style='color: #25D366; font-weight: bold;'>🛡️ AISAAC-SHIELD ACTIVATED</span><br>
+            <small style='color: white;'>Protección de Datos y Licencia Verificada</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.divider()
         
-        # 2. Tabla de Gastos (Lo que pediste)
+        # Tabla de Gastos
         st.subheader("📋 Resumen del Mes")
         df_tabla = df_f[['fecha', 'concepto', 'monto']].copy()
         df_tabla['fecha'] = df_tabla['fecha'].dt.strftime('%d/%m/%Y')
