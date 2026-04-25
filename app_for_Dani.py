@@ -11,7 +11,7 @@ import time
 
 # --- 0. CONFIGURACIÓN Y ZONA HORARIA ---
 st.set_page_config(page_title="RutaMaster - Dani", layout="centered")
-ZONA_CR = timezone(timedelta(hours=-6)) # Hora exacta de Costa Rica
+ZONA_CR = timezone(timedelta(hours=-6)) # Hora oficial de Costa Rica
 
 @st.cache_resource
 def init_conexion():
@@ -45,15 +45,16 @@ st.markdown(f"""
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
     
-    /* ANIMACIÓN DE PULSO DE NEÓN */
-    @keyframes neon-pulse {{
-        0% {{ border-color: rgba(37, 211, 102, 0.3); box-shadow: 0 0 5px rgba(37, 211, 102, 0.2); }}
+    /* ANIMACIÓN DE ESCANEO DE NEÓN */
+    @keyframes neon-scan {{
+        0% {{ border-color: rgba(37, 211, 102, 0.2); box-shadow: 0 0 5px rgba(37, 211, 102, 0.1); }}
         50% {{ border-color: rgba(37, 211, 102, 1); box-shadow: 0 0 20px rgba(37, 211, 102, 0.5); }}
-        100% {{ border-color: rgba(37, 211, 102, 0.3); box-shadow: 0 0 5px rgba(37, 211, 102, 0.2); }}
+        100% {{ border-color: rgba(37, 211, 102, 0.2); box-shadow: 0 0 5px rgba(37, 211, 102, 0.1); }}
     }}
 
     .shield-box {{ 
-        margin: 20px 0; padding: 20px; text-align: center; border: 2px solid #25D366; animation: neon-pulse 2s infinite ease-in-out;
+        margin: 20px 0; padding: 20px; text-align: center; border: 2px solid #25D366;
+        animation: neon-scan 2.5s infinite ease-in-out;
         background: 
             linear-gradient(to right, #25D366 4px, transparent 4px) 0 0,
             linear-gradient(to bottom, #25D366 4px, transparent 4px) 0 0,
@@ -69,11 +70,17 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIN CON AVISO ANIMADO ---
+# --- 3. LOGIN CON AVISO DE SEGURIDAD ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 if not st.session_state['autenticado']:
     st.markdown("<h1 style='text-align: center; color: #25D366;'>🚚 RUTAMASTER</h1>", unsafe_allow_html=True)
-    st.markdown("""<div class='shield-box'><b style='color: #25D366; font-size: 1.2rem;'>⚠️ AVISO DE SEGURIDAD</b><br><span style='color: white;'>Esta aplicación está protegida por <b>Aisaac-Shield</b>.</span><br><small style='color: #25D366;'>Acceso restringido y monitoreado.</small></div>""", unsafe_allow_html=True)
+    st.markdown("""
+    <div class='shield-box'>
+        <b style='color: #25D366; font-size: 1.1rem;'>⚠️ AVISO DE SEGURIDAD</b><br>
+        <span style='color: white;'>Esta aplicación está protegida por <b>Aisaac-Shield</b>.</span><br>
+        <small style='color: #25D366;'>El acceso no autorizado será registrado.</small>
+    </div>
+    """, unsafe_allow_html=True)
     pin = st.text_input("PIN DE ACCESO", type="password", placeholder="****")
     if st.button("ENTRAR"):
         if pin == "8715": st.session_state.update({'autenticado': True, 'user': "dany"})
@@ -105,9 +112,9 @@ except: pass
 
 tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
-# --- TAB 1: REGISTRO ---
+# --- TAB 1: REGISTRO (CONVERSIÓN A ENTEROS) ---
 with tabs[0]:
-    op = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
+    op = st.radio("ACCION:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
     if op == "💸 Gasto Operativo":
         with st.form("f_g", clear_on_submit=True):
             f = st.date_input("Fecha", hoy_cr.date())
@@ -122,15 +129,15 @@ with tabs[0]:
         with st.form("f_v", clear_on_submit=True):
             f = st.date_input("Fecha", hoy_cr.date())
             c1, c2 = st.columns(2); o = c1.text_input("Origen"); d = c2.text_input("Destino")
-            km = st.number_input("KM Llegada", value=None, placeholder=f"Último: {km_actual}")
+            km = st.number_input("KM Llegada", value=None, placeholder=f"Llevas: {km_actual}")
             cost = st.number_input("Costo Viaje", value=None)
             if st.form_submit_button("FINALIZAR VIAJE"):
                 if km and o and d:
-                    # Guardado forzando números enteros
+                    # Guardado forzando números enteros para evitar error BigInt
                     supabase.table("viajes").insert({"fecha": str(f), "origen": o, "destino": d, "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)}).execute()
                     st.success("✅ Viaje Registrado"); st.balloons(); time.sleep(1.5); st.rerun()
 
-# --- TAB 2 Y 3: VISUALIZACIÓN ---
+# --- TAB 2 Y 3 (VISUALIZACIÓN LIMPIA) ---
 with tabs[1]:
     if not df_f.empty:
         for i, row in df_f.iterrows():
@@ -151,5 +158,4 @@ with tabs[2]:
         st.plotly_chart(fig, use_container_width=True)
         st.dataframe(df_f[['fecha', 'concepto', 'monto']], hide_index=True, use_container_width=True)
     
-    # SELLO INFERIOR ANIMADO
-    st.markdown("<div class='shield-box'><span style='color: #25D366; font-weight: 900;'>🛡️ AISAAC-SHIELD ACTIVATED</span></div>", unsafe_allow_html=True)
+    st.markdown("<div class='shield-box'><span style='color:#25D366; font-weight:900;'>🛡️ AISAAC-SHIELD ACTIVATED</span></div>", unsafe_allow_html=True)
