@@ -11,7 +11,7 @@ import time
 
 # --- 0. CONFIGURACIÓN Y ZONA HORARIA ---
 st.set_page_config(page_title="RutaMaster - Dani", layout="centered")
-ZONA_CR = timezone(timedelta(hours=-6)) # Hora oficial de Costa Rica
+ZONA_CR = timezone(timedelta(hours=-6)) # Hora exacta para Costa Rica
 
 @st.cache_resource
 def init_conexion():
@@ -45,16 +45,16 @@ st.markdown(f"""
     h1, h2, h3, label, .stMetric {{ color: #25D366 !important; font-weight: 800; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; }}
     
-    /* ANIMACIÓN DE ESCANEO DE NEÓN */
-    @keyframes neon-scan {{
-        0% {{ border-color: rgba(37, 211, 102, 0.2); box-shadow: 0 0 5px rgba(37, 211, 102, 0.1); }}
-        50% {{ border-color: rgba(37, 211, 102, 1); box-shadow: 0 0 20px rgba(37, 211, 102, 0.5); }}
-        100% {{ border-color: rgba(37, 211, 102, 0.2); box-shadow: 0 0 5px rgba(37, 211, 102, 0.1); }}
+    /* ANIMACIÓN DE PULSO DE NEÓN PARA AISAAC-SHIELD */
+    @keyframes neon-glow {{
+        0% {{ border-color: rgba(37, 211, 102, 0.3); box-shadow: 0 0 5px rgba(37, 211, 102, 0.2); }}
+        50% {{ border-color: rgba(37, 211, 102, 1); box-shadow: 0 0 20px rgba(37, 211, 102, 0.6); }}
+        100% {{ border-color: rgba(37, 211, 102, 0.3); box-shadow: 0 0 5px rgba(37, 211, 102, 0.2); }}
     }}
 
     .shield-box {{ 
         margin: 20px 0; padding: 20px; text-align: center; border: 2px solid #25D366;
-        animation: neon-scan 2.5s infinite ease-in-out;
+        animation: neon-glow 2s infinite ease-in-out;
         background: 
             linear-gradient(to right, #25D366 4px, transparent 4px) 0 0,
             linear-gradient(to bottom, #25D366 4px, transparent 4px) 0 0,
@@ -72,6 +72,7 @@ st.markdown(f"""
 
 # --- 3. LOGIN CON AVISO DE SEGURIDAD ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
+
 if not st.session_state['autenticado']:
     st.markdown("<h1 style='text-align: center; color: #25D366;'>🚚 RUTAMASTER</h1>", unsafe_allow_html=True)
     st.markdown("""
@@ -88,7 +89,7 @@ if not st.session_state['autenticado']:
         if st.session_state['autenticado']: st.rerun()
     st.stop()
 
-# --- 4. DATA ENGINE ---
+# --- 4. CARGA DE DATOS ---
 u = st.session_state['user']
 meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 hoy_cr = datetime.now(ZONA_CR)
@@ -114,13 +115,13 @@ tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
 # --- TAB 1: REGISTRO (CONVERSIÓN A ENTEROS) ---
 with tabs[0]:
-    op = st.radio("ACCION:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
+    op = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
     if op == "💸 Gasto Operativo":
         with st.form("f_g", clear_on_submit=True):
             f = st.date_input("Fecha", hoy_cr.date())
             tipo = st.selectbox("Tipo", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
             monto = st.number_input("Monto (CRC)", value=None, step=500)
-            foto = st.file_uploader("Ticket", type=['jpg','png','jpeg'])
+            foto = st.file_uploader("Foto", type=['jpg','png','jpeg'])
             if st.form_submit_button("GUARDAR GASTO"):
                 if monto:
                     supabase.table("gastos").insert({"fecha": str(f), "concepto": tipo, "monto": int(monto), "cliente_id": u, "foto_comprobante": procesar_foto(foto) if foto else None}).execute()
@@ -129,15 +130,15 @@ with tabs[0]:
         with st.form("f_v", clear_on_submit=True):
             f = st.date_input("Fecha", hoy_cr.date())
             c1, c2 = st.columns(2); o = c1.text_input("Origen"); d = c2.text_input("Destino")
-            km = st.number_input("KM Llegada", value=None, placeholder=f"Llevas: {km_actual}")
+            km = st.number_input("KM Llegada", value=None, placeholder=f"Último: {km_actual}")
             cost = st.number_input("Costo Viaje", value=None)
             if st.form_submit_button("FINALIZAR VIAJE"):
                 if km and o and d:
-                    # Guardado forzando números enteros para evitar error BigInt
+                    # Forzamos int para evitar error de sintaxis bigint
                     supabase.table("viajes").insert({"fecha": str(f), "origen": o, "destino": d, "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)}).execute()
                     st.success("✅ Viaje Registrado"); st.balloons(); time.sleep(1.5); st.rerun()
 
-# --- TAB 2 Y 3 (VISUALIZACIÓN LIMPIA) ---
+# --- TAB 2 Y 3 (VISUALIZACIÓN) ---
 with tabs[1]:
     if not df_f.empty:
         for i, row in df_f.iterrows():
@@ -152,7 +153,7 @@ with tabs[2]:
     st.metric("KILOMETRAJE ACTUAL", f"{km_actual:,} KM")
     if not df_f.empty:
         st.metric(f"TOTAL {m_sel.upper()}", f"CRC {df_f['monto'].sum():,.0f}")
-        # Gráfico redondo (Dona)
+        # Gráfico redondo (Pastel/Dona)
         fig = px.pie(df_f.groupby('concepto')['monto'].sum().reset_index(), values='monto', names='concepto', hole=0.5, color_discrete_sequence=px.colors.sequential.Greens_r)
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', legend_font_color="#25D366", margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig, use_container_width=True)
