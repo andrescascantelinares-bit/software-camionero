@@ -119,25 +119,27 @@ tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
 # --- TAB 1: REGISTRO ---
 with tabs[0]:
+    # Selección de qué tipo de actividad registrar
     opcion = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"], horizontal=True)
     hoy_cr = hoy_cr_dt.date()
     
     if opcion == "💸 Gasto Operativo":
-        st.markdown("### 📝 Registrar Nuevo Gasto")
+        st.markdown("### 📝 Nuevo Gasto")
         with st.form("f_gasto", clear_on_submit=True):
             fecha = st.date_input("Fecha del Gasto", hoy_cr)
             c1, c2 = st.columns(2)
-            # Se agregó "Alimentación" que suele ser común en rutas
+            # Lista de conceptos para el selector
             tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Alimentación", "Otros"])
             monto = c2.number_input("Monto (CRC)", min_value=0, step=500, format="%d")
-            foto = st.file_uploader("Comprobante / Factura (Opcional)", type=['jpg', 'png', 'jpeg'])
+            
+            foto = st.file_uploader("Subir Comprobante (Opcional)", type=['jpg', 'png', 'jpeg'])
             
             submit_gasto = st.form_submit_button("GUARDAR GASTO")
             
             if submit_gasto:
                 if monto > 0:
                     try:
-                        # Procesar imagen solo si el usuario subió una
+                        # Procesamiento de la imagen a base64
                         foto_b64 = procesar_foto(foto) if foto else None
                         
                         data_gasto = {
@@ -148,60 +150,58 @@ with tabs[0]:
                             "foto_comprobante": foto_b64
                         }
                         
-                        # Inserción segura en Supabase
+                        # Inserción en la tabla de gastos de Supabase
                         supabase.table("gastos").insert(data_gasto).execute()
                         
-                        st.success(f"✅ ¡Gasto de {tipo} por ₡{monto} guardado exitosamente!")
+                        st.success(f"✅ Gasto de {tipo} por ₡{monto:,} guardado.")
                         time.sleep(1.5)
                         st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Error al guardar en la base de datos. Detalles: {e}")
+                        st.error(f"❌ Error al conectar con la base de datos: {e}")
                 else:
-                    st.warning("⚠️ El monto debe ser mayor a ₡0 para registrar el gasto.")
+                    st.warning("⚠️ El monto debe ser mayor a 0 para registrar un gasto.")
                     
     elif opcion == "🛣️ Finalizar Viaje":
-        st.markdown("### 🏁 Registrar Fin de Viaje")
+        st.markdown("### 🏁 Cierre de Viaje")
         with st.form("f_viaje", clear_on_submit=True):
-            fecha = st.date_input("Fecha de Finalización", hoy_cr)
-            cli = st.text_input("Nombre del Cliente / Empresa")
+            fecha = st.date_input("Fecha", hoy_cr)
+            cli = st.text_input("Cliente / Empresa")
             
             c3, c4 = st.columns(2)
-            orig = c3.text_input("Lugar de Origen")
-            dest = c4.text_input("Lugar de Destino")
+            orig = c3.text_input("Origen")
+            dest = c4.text_input("Destino")
             
             c5, c6 = st.columns(2)
-            cost = c5.number_input("Costo/Cobro del Viaje (CRC)", min_value=0, step=1000)
-            # El kilometraje mínimo permitido es el kilometraje actual registrado
-            km = c6.number_input("Kilometraje a la Llegada", min_value=km_actual, step=1, placeholder=f"Actual: {km_actual}")
+            cost = c5.number_input("Costo del Viaje", min_value=0, step=1000)
+            # El kilometraje sugerido es el actual más 1
+            km = c6.number_input("KM a la Llegada", min_value=km_actual, step=1, placeholder=f"Actual: {km_actual}")
             
-            submit_viaje = st.form_submit_button("GUARDAR VIAJE")
+            submit_viaje = st.form_submit_button("REGISTRAR VIAJE")
             
             if submit_viaje:
-                if km and orig and dest and cli:
-                    if km >= km_actual:
-                        try:
-                            data_viaje = {
-                                "fecha": str(fecha), 
-                                "cliente": cli, 
-                                "origen": orig, 
-                                "destino": dest, 
-                                "monto": int(cost) if cost else 0, 
-                                "cliente_id": u, 
-                                "km_actual": int(km)
-                            }
-                            
-                            supabase.table("viajes").insert(data_viaje).execute()
-                            
-                            st.success("✅ ¡Viaje registrado correctamente!")
-                            st.balloons()
-                            time.sleep(2)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error al guardar el viaje: {e}")
-                    else:
-                        st.warning(f"⚠️ El kilometraje de llegada ({km}) no puede ser menor al actual ({km_actual}).")
+                if cli and orig and dest and km > 0:
+                    try:
+                        data_viaje = {
+                            "fecha": str(fecha), 
+                            "cliente": cli, 
+                            "origen": orig, 
+                            "destino": dest, 
+                            "monto": int(cost) if cost else 0, 
+                            "cliente_id": u, 
+                            "km_actual": int(km)
+                        }
+                        
+                        # Inserción en la tabla de viajes de Supabase
+                        supabase.table("viajes").insert(data_viaje).execute()
+                        
+                        st.success("✅ Viaje finalizado y registrado.")
+                        st.balloons()
+                        time.sleep(2)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al guardar el viaje: {e}")
                 else:
-                    st.warning("⚠️ Por favor completa todos los campos requeridos (Cliente, Origen, Destino y Kilometraje).")
+                    st.warning("⚠️ Completa todos los campos (Cliente, Origen, Destino y KM) para finalizar.")
 
 # --- TAB 2: GASTOS ---
 with tabs[1]:
