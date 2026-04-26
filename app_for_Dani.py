@@ -33,7 +33,7 @@ def get_base64(file_path):
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-# --- 2. DISEÑO VISUAL MEJORADO (AISAAC-SHIELD) ---
+# --- 2. DISEÑO VISUAL Y LUCES NEÓN ---
 fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH") if "APP_BACKGROUND_PATH" in st.secrets else None)
 
 st.markdown(f"""
@@ -51,45 +51,43 @@ st.markdown(f"""
         margin-bottom: 20px;
     }}
 
+    /* EFECTO DE LUCES NEÓN FINAL */
+    .neon-shield {{
+        text-align: center;
+        color: #25D366 !important;
+        font-weight: bold;
+        letter-spacing: 3px;
+        padding: 15px;
+        margin-top: 40px;
+        border: 2px solid #25D366;
+        border-radius: 15px;
+        background: rgba(37, 211, 102, 0.1);
+        box-shadow: 0 0 20px rgba(37, 211, 102, 0.6), inset 0 0 10px rgba(37, 211, 102, 0.4);
+        text-shadow: 0 0 12px rgba(37, 211, 102, 1);
+        animation: pulse-neon 2s infinite alternate;
+    }}
+
+    @keyframes pulse-neon {{
+        from {{ box-shadow: 0 0 10px rgba(37, 211, 102, 0.4); }}
+        to {{ box-shadow: 0 0 25px rgba(37, 211, 102, 0.8); }}
+    }}
+
     .gasto-card {{ 
         background: rgba(0, 0, 0, 0.95) !important; 
         padding: 20px; border-radius: 15px; border: 1px solid #25D366; 
         margin-bottom: 10px;
     }}
-    .gasto-fecha {{ color: #25D366 !important; font-weight: bold; }}
-    .gasto-info {{ color: #FFFFFF !important; font-size: 1.1rem; }}
 
-    .success-shield {{
-        background: #25D366;
-        color: black !important;
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        font-weight: 900;
-        font-size: 1.2rem;
-        border: 2px solid white;
-        margin: 10px 0;
-    }}
-
-    /* BOTONES DE EXPORTACIÓN PERSONALIZADOS */
+    /* BOTONES DE EXPORTACIÓN CON COLORES OFICIALES */
     div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stDownloadButton"] button {{
         background: rgba(0, 50, 0, 0.8) !important;
         border: 2px solid #217346 !important;
         color: #217346 !important;
     }}
-    div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stDownloadButton"] button:hover {{
-        background: #217346 !important;
-        color: white !important;
-    }}
-
     div[data-testid="stColumn"]:nth-of-type(3) [data-testid="stDownloadButton"] button {{
         background: rgba(50, 0, 0, 0.8) !important;
         border: 2px solid #FF0000 !important;
         color: #FF0000 !important;
-    }}
-    div[data-testid="stColumn"]:nth-of-type(3) [data-testid="stDownloadButton"] button:hover {{
-        background: #FF0000 !important;
-        color: white !important;
     }}
 
     h1, h2, h3, label {{ color: #25D366 !important; }}
@@ -136,7 +134,7 @@ except: pass
 
 tabs = st.tabs(["REGISTRO", "GASTOS", "DATOS"])
 
-# --- TAB 1: REGISTRO ---
+# --- TAB 1: REGISTRO (CON ESCRITURA INTELIGENTE) ---
 with tabs[0]:
     st.markdown("### Finalizar Viaje")
     with st.form("f_viaje", clear_on_submit=True):
@@ -147,22 +145,17 @@ with tabs[0]:
         dest = c4.text_input("Destino")
         c5, c6 = st.columns(2)
         
-        # Escritura inteligente: value=None para campo vacío
-        cost = c5.number_input("Costo (CRC)", min_value=0, value=None, placeholder="Monto del viaje...")
-        km = c6.number_input("KM Llegada", min_value=km_actual, value=None, placeholder=f"Mínimo: {km_actual}")
+        cost = c5.number_input("Costo (CRC)", min_value=0, value=None, placeholder="Monto...")
+        km = c6.number_input("KM Llegada", min_value=km_actual, value=None, placeholder=f"Min: {km_actual}")
         
         if st.form_submit_button("REGISTRAR VIAJE"):
             if cli and orig and dest and km is not None:
-                try:
-                    supabase.table("viajes").insert({
-                        "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
-                        "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)
-                    }).execute()
-                    st.markdown("<div class='success-shield'>VIAJE GUARDADO CON EXITO</div>", unsafe_allow_html=True)
-                    st.balloons()
-                    time.sleep(2); st.rerun()
-                except Exception as e: st.error(f"Error: {e}")
-            else: st.warning("Completa los campos obligatorios")
+                supabase.table("viajes").insert({
+                    "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
+                    "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)
+                }).execute()
+                st.success("VIAJE GUARDADO")
+                time.sleep(1.5); st.rerun()
 
 # --- TAB 2: GASTOS ---
 with tabs[1]:
@@ -170,43 +163,26 @@ with tabs[1]:
         with st.form("f_gasto_nuevo", clear_on_submit=True):
             f_gasto = st.date_input("Fecha", hoy_cr_dt.date())
             tipo = st.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
-            
-            # Escritura inteligente: value=None para campo vacío
-            monto = st.number_input("Monto (CRC)", min_value=0, value=None, placeholder="Monto del gasto...")
-            
-            foto = st.file_uploader("Subir foto", type=['jpg', 'png', 'jpeg'])
+            monto = st.number_input("Monto (CRC)", min_value=0, value=None, placeholder="Monto...")
+            foto = st.file_uploader("Foto", type=['jpg', 'png', 'jpeg'])
             if st.form_submit_button("GUARDAR GASTO"):
-                if monto is not None and monto > 0:
+                if monto:
                     foto_b64 = procesar_foto(foto) if foto else None
                     supabase.table("gastos").insert({
                         "fecha": str(f_gasto), "concepto": tipo, "monto": int(monto), 
                         "cliente_id": u, "foto_comprobante": foto_b64
                     }).execute()
-                    st.markdown("<div class='success-shield'>GASTO REGISTRADO</div>", unsafe_allow_html=True)
-                    time.sleep(1.5); st.rerun()
-                else: st.warning("Ingresa un monto válido")
+                    st.rerun()
 
     if not df_f.empty:
         for i, row in df_f.iterrows():
-            st.markdown(f"""
-            <div class='gasto-card'>
-                <div class='gasto-fecha'>{row['fecha'].strftime('%d %b')}</div>
-                <div class='gasto-info'><b>{row['concepto']}</b> - ₡{row['monto']:,}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1:
-                if row.get('foto_comprobante'):
-                    with st.popover("Ver Foto", use_container_width=True):
-                        st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
-            with c2:
-                if st.button("Borrar", key=f"del_{row['id']}", use_container_width=True):
-                    supabase.table("gastos").delete().eq("id", row['id']).execute(); st.rerun()
+            st.markdown(f"<div class='gasto-card'><b>{row['fecha'].strftime('%d %b')}</b> | {row['concepto']} - ₡{row['monto']:,}</div>", unsafe_allow_html=True)
+            if st.button("Borrar", key=f"del_{row['id']}", use_container_width=True):
+                supabase.table("gastos").delete().eq("id", row['id']).execute(); st.rerun()
 
-# --- TAB 3: DATOS ---
+# --- TAB 3: DATOS (CON EXPORTACIÓN A LA DERECHA) ---
 with tabs[2]:
     c_metrics, c_btn_excel, c_btn_pdf = st.columns([2, 1, 1])
-    
     with c_metrics:
         st.metric("KM ACTUAL", f"{km_actual:,} KM")
         if not df_f.empty:
@@ -219,16 +195,12 @@ with tabs[2]:
         with c_btn_excel:
             st.markdown("<br>", unsafe_allow_html=True)
             st.download_button(label="EXCEL", data=df_export.to_csv(index=False).encode('utf-8'), 
-                               file_name=f"Gastos_{u}_{m_sel}.csv", mime="text/csv", use_container_width=True)
-            
+                               file_name=f"Gastos_{u}.csv", mime="text/csv", use_container_width=True)
         with c_btn_pdf:
             st.markdown("<br>", unsafe_allow_html=True)
-            reporte_txt = f"REPORTE GASTOS - {u.upper()}\nTOTAL: ₡{df_export['monto'].sum():,}\n\n{df_export.to_string(index=False)}"
-            st.download_button(label="PDF", data=reporte_txt, 
-                               file_name=f"Reporte_{u}_{m_sel}.txt", mime="text/plain", use_container_width=True)
-
+            st.download_button(label="PDF", data=df_export.to_string(), 
+                               file_name=f"Reporte_{u}.txt", mime="text/plain", use_container_width=True)
         st.dataframe(df_export, hide_index=True, use_container_width=True)
-    else:
-        st.info("Sin datos para exportar")
-        
-    st.markdown("<div style='text-align:center; color:#25D366; margin-top:30px;'>AISAAC-SHIELD PROTECTED</div>", unsafe_allow_html=True)
+
+# --- CIERRE DE APLICACIÓN CON LUCES NEÓN ---
+st.markdown("<div class='neon-shield'>🛡️ AISAAC-SHIELD PROTECTED</div>", unsafe_allow_html=True)
