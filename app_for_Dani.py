@@ -119,40 +119,89 @@ tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
 # --- TAB 1: REGISTRO ---
 with tabs[0]:
-    opcion = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"])
+    opcion = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"], horizontal=True)
     hoy_cr = hoy_cr_dt.date()
     
     if opcion == "💸 Gasto Operativo":
+        st.markdown("### 📝 Registrar Nuevo Gasto")
         with st.form("f_gasto", clear_on_submit=True):
-            fecha = st.date_input("Fecha", hoy_cr)
+            fecha = st.date_input("Fecha del Gasto", hoy_cr)
             c1, c2 = st.columns(2)
-            tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
-            monto = c2.number_input("Monto (CRC)", value=None, step=500)
-            foto = st.file_uploader("Buscar imagen en galería", type=['jpg', 'png', 'jpeg'])
-            if st.form_submit_button("GUARDAR GASTO"):
-                if monto:
-                    supabase.table("gastos").insert({
-                        "fecha": str(fecha), "concepto": tipo, "monto": int(monto), 
-                        "cliente_id": u, "foto_comprobante": procesar_foto(foto) if foto else None
-                    }).execute()
-                    st.success("✅ Guardado"); time.sleep(1); st.rerun()
+            # Se agregó "Alimentación" que suele ser común en rutas
+            tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Alimentación", "Otros"])
+            monto = c2.number_input("Monto (CRC)", min_value=0, step=500, format="%d")
+            foto = st.file_uploader("Comprobante / Factura (Opcional)", type=['jpg', 'png', 'jpeg'])
+            
+            submit_gasto = st.form_submit_button("GUARDAR GASTO")
+            
+            if submit_gasto:
+                if monto > 0:
+                    try:
+                        # Procesar imagen solo si el usuario subió una
+                        foto_b64 = procesar_foto(foto) if foto else None
+                        
+                        data_gasto = {
+                            "fecha": str(fecha), 
+                            "concepto": tipo, 
+                            "monto": int(monto), 
+                            "cliente_id": u, 
+                            "foto_comprobante": foto_b64
+                        }
+                        
+                        # Inserción segura en Supabase
+                        supabase.table("gastos").insert(data_gasto).execute()
+                        
+                        st.success(f"✅ ¡Gasto de {tipo} por ₡{monto} guardado exitosamente!")
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al guardar en la base de datos. Detalles: {e}")
+                else:
+                    st.warning("⚠️ El monto debe ser mayor a ₡0 para registrar el gasto.")
                     
     elif opcion == "🛣️ Finalizar Viaje":
+        st.markdown("### 🏁 Registrar Fin de Viaje")
         with st.form("f_viaje", clear_on_submit=True):
-            fecha = st.date_input("Fecha", hoy_cr)
-            cli = st.text_input("Cliente")
-            c3, c4 = st.columns(2); orig = c3.text_input("Origen"); dest = c4.text_input("Destino")
+            fecha = st.date_input("Fecha de Finalización", hoy_cr)
+            cli = st.text_input("Nombre del Cliente / Empresa")
+            
+            c3, c4 = st.columns(2)
+            orig = c3.text_input("Lugar de Origen")
+            dest = c4.text_input("Lugar de Destino")
+            
             c5, c6 = st.columns(2)
-            cost = c5.number_input("Costo Viaje", value=None)
-            km = c6.number_input("KM Llegada", value=None, placeholder=f"Llevas: {km_actual}")
-            if st.form_submit_button("GUARDAR VIAJE"):
-                if km and orig and dest:
-                    # Forzamos enteros para evitar errores BigInt
-                    supabase.table("viajes").insert({
-                        "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
-                        "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)
-                    }).execute()
-                    st.success("✅ Viaje Registrado"); st.balloons(); time.sleep(1.5); st.rerun()
+            cost = c5.number_input("Costo/Cobro del Viaje (CRC)", min_value=0, step=1000)
+            # El kilometraje mínimo permitido es el kilometraje actual registrado
+            km = c6.number_input("Kilometraje a la Llegada", min_value=km_actual, step=1, placeholder=f"Actual: {km_actual}")
+            
+            submit_viaje = st.form_submit_button("GUARDAR VIAJE")
+            
+            if submit_viaje:
+                if km and orig and dest and cli:
+                    if km >= km_actual:
+                        try:
+                            data_viaje = {
+                                "fecha": str(fecha), 
+                                "cliente": cli, 
+                                "origen": orig, 
+                                "destino": dest, 
+                                "monto": int(cost) if cost else 0, 
+                                "cliente_id": u, 
+                                "km_actual": int(km)
+                            }
+                            
+                            supabase.table("viajes").insert(data_viaje).execute()
+                            
+                            st.success("✅ ¡Viaje registrado correctamente!")
+                            st.balloons()
+                            time.sleep(2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error al guardar el viaje: {e}")
+                    else:
+                        st.warning(f"⚠️ El kilometraje de llegada ({km}) no puede ser menor al actual ({km_actual}).")
+                else:
+                    st.warning("⚠️ Por favor completa todos los campos requeridos (Cliente, Origen, Destino y Kilometraje).")
 
 # --- TAB 2: GASTOS ---
 with tabs[1]:
