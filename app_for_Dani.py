@@ -117,92 +117,83 @@ except: pass
 
 tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
 
-# --- TAB 1: REGISTRO ---
+# --- TAB 1: REGISTRO (Ahora enfocada en Viajes) ---
 with tabs[0]:
-    # Selección de qué tipo de actividad registrar
-    opcion = st.radio("QUÉ REGISTRAMOS:", ["💸 Gasto Operativo", "🛣️ Finalizar Viaje"], horizontal=True)
-    hoy_cr = hoy_cr_dt.date()
-    
-    if opcion == "💸 Gasto Operativo":
-        st.markdown("### 📝 Nuevo Gasto")
-        with st.form("f_gasto", clear_on_submit=True):
-            fecha = st.date_input("Fecha del Gasto", hoy_cr)
-            c1, c2 = st.columns(2)
-            # Lista de conceptos para el selector
-            tipo = c1.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Alimentación", "Otros"])
-            monto = c2.number_input("Monto (CRC)", min_value=0, step=500, format="%d")
-            
-            foto = st.file_uploader("Subir Comprobante (Opcional)", type=['jpg', 'png', 'jpeg'])
-            
-            submit_gasto = st.form_submit_button("GUARDAR GASTO")
-            
-            if submit_gasto:
-                if monto > 0:
-                    try:
-                        # Procesamiento de la imagen a base64
-                        foto_b64 = procesar_foto(foto) if foto else None
-                        
-                        data_gasto = {
-                            "fecha": str(fecha), 
-                            "concepto": tipo, 
-                            "monto": int(monto), 
-                            "cliente_id": u, 
-                            "foto_comprobante": foto_b64
-                        }
-                        
-                        # Inserción en la tabla de gastos de Supabase
-                        supabase.table("gastos").insert(data_gasto).execute()
-                        
-                        st.success(f"✅ Gasto de {tipo} por ₡{monto:,} guardado.")
-                        time.sleep(1.5)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Error al conectar con la base de datos: {e}")
-                else:
-                    st.warning("⚠️ El monto debe ser mayor a 0 para registrar un gasto.")
-                    
-    elif opcion == "🛣️ Finalizar Viaje":
-        st.markdown("### 🏁 Cierre de Viaje")
-        with st.form("f_viaje", clear_on_submit=True):
-            fecha = st.date_input("Fecha", hoy_cr)
-            cli = st.text_input("Cliente / Empresa")
-            
-            c3, c4 = st.columns(2)
-            orig = c3.text_input("Origen")
-            dest = c4.text_input("Destino")
-            
-            c5, c6 = st.columns(2)
-            cost = c5.number_input("Costo del Viaje", min_value=0, step=1000)
-            # El kilometraje sugerido es el actual más 1
-            km = c6.number_input("KM a la Llegada", min_value=km_actual, step=1, placeholder=f"Actual: {km_actual}")
-            
-            submit_viaje = st.form_submit_button("REGISTRAR VIAJE")
-            
-            if submit_viaje:
-                if cli and orig and dest and km > 0:
-                    try:
-                        data_viaje = {
-                            "fecha": str(fecha), 
-                            "cliente": cli, 
-                            "origen": orig, 
-                            "destino": dest, 
-                            "monto": int(cost) if cost else 0, 
-                            "cliente_id": u, 
-                            "km_actual": int(km)
-                        }
-                        
-                        # Inserción en la tabla de viajes de Supabase
-                        supabase.table("viajes").insert(data_viaje).execute()
-                        
-                        st.success("✅ Viaje finalizado y registrado.")
-                        st.balloons()
-                        time.sleep(2)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Error al guardar el viaje: {e}")
-                else:
-                    st.warning("⚠️ Completa todos los campos (Cliente, Origen, Destino y KM) para finalizar.")
+    st.markdown("### Finalizar Viaje")
+    with st.form("f_viaje", clear_on_submit=True):
+        fecha = st.date_input("Fecha", hoy_cr_dt.date())
+        cli = st.text_input("Cliente / Empresa")
+        
+        c3, c4 = st.columns(2)
+        orig = c3.text_input("Origen")
+        dest = c4.text_input("Destino")
+        
+        c5, c6 = st.columns(2)
+        cost = c5.number_input("Costo del Viaje (CRC)", min_value=0, step=1000)
+        km = c6.number_input("Kilometraje de Llegada", min_value=km_actual, step=1, placeholder=f"Actual: {km_actual}")
+        
+        if st.form_submit_button("REGISTRAR VIAJE"):
+            if cli and orig and dest and km > 0:
+                try:
+                    supabase.table("viajes").insert({
+                        "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
+                        "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)
+                    }).execute()
+                    st.success("Viaje registrado con éxito")
+                    st.balloons()
+                    time.sleep(1.5)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+            else:
+                st.warning("⚠️ Completa los datos del viaje.")
 
+# --- TAB 2: GASTOS (Registro y Visualización) ---
+with tabs[1]:
+    # Sección para agregar nuevo gasto arriba
+    with st.expander("AGREGAR NUEVO GASTO", expanded=False):
+        with st.form("f_gasto_rapido", clear_on_submit=True):
+            f_gasto = st.date_input("Fecha", hoy_cr_dt.date())
+            tipo = st.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
+            monto = st.number_input("Monto (CRC)", min_value=0, step=500)
+            foto = st.file_uploader("Comprobante", type=['jpg', 'png', 'jpeg'])
+            
+            if st.form_submit_button("GUARDAR GASTO"):
+                if monto > 0:
+                    foto_b64 = procesar_foto(foto) if foto else None
+                    supabase.table("gastos").insert({
+                        "fecha": str(f_gasto), "concepto": tipo, "monto": int(monto), 
+                        "cliente_id": u, "foto_comprobante": foto_b64
+                    }).execute()
+                    st.success("Gasto guardado")
+                    time.sleep(1)
+                    st.rerun()
+
+    st.divider()
+
+    # Visualización de gastos existentes
+    if not df_f.empty:
+        for i, row in df_f.iterrows():
+            with st.container():
+                st.markdown(f"""
+                <div class='gasto-card'>
+                    <small>{row['fecha'].strftime('%d %b')}</small><br>
+                    <b>{row['concepto']}</b><br>
+                    <span style='color:#25D366; font-size:1.2rem;'>CRC {row['monto']:,.0f}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                col_btn1, col_btn2 = st.columns([1, 1])
+                if row.get('foto_comprobante'):
+                    with col_btn1:
+                        with st.popover("📷 Ver"): 
+                            st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
+                with col_btn2:
+                    if st.button("Borrar", key=f"del_{row['id']}"):
+                        supabase.table("gastos").delete().eq("id", row['id']).execute()
+                        st.rerun()
+    else:
+        st.info(f"No hay gastos registrados en {m_sel}.")
 # --- TAB 2: GASTOS ---
 with tabs[1]:
     if not df_f.empty:
