@@ -33,7 +33,7 @@ def get_base64(file_path):
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-# --- 2. DISEÑO VISUAL MEJORADO ---
+# --- 2. DISEÑO VISUAL MEJORADO (AISAAC-SHIELD) ---
 fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH") if "APP_BACKGROUND_PATH" in st.secrets else None)
 
 st.markdown(f"""
@@ -146,18 +146,23 @@ with tabs[0]:
         orig = c3.text_input("Origen")
         dest = c4.text_input("Destino")
         c5, c6 = st.columns(2)
-        cost = c5.number_input("Costo (CRC)", min_value=0)
-        km = c6.number_input("KM Llegada", min_value=km_actual, placeholder=f"Actual: {km_actual}")
+        
+        # Escritura inteligente: value=None para campo vacío
+        cost = c5.number_input("Costo (CRC)", min_value=0, value=None, placeholder="Monto del viaje...")
+        km = c6.number_input("KM Llegada", min_value=km_actual, value=None, placeholder=f"Mínimo: {km_actual}")
         
         if st.form_submit_button("REGISTRAR VIAJE"):
-            if cli and orig and dest and km > 0:
-                supabase.table("viajes").insert({
-                    "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
-                    "monto": int(cost), "cliente_id": u, "km_actual": int(km)
-                }).execute()
-                st.markdown("<div class='success-shield'>VIAJE GUARDADO CON EXITO</div>", unsafe_allow_html=True)
-                st.balloons()
-                time.sleep(2); st.rerun()
+            if cli and orig and dest and km is not None:
+                try:
+                    supabase.table("viajes").insert({
+                        "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
+                        "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)
+                    }).execute()
+                    st.markdown("<div class='success-shield'>VIAJE GUARDADO CON EXITO</div>", unsafe_allow_html=True)
+                    st.balloons()
+                    time.sleep(2); st.rerun()
+                except Exception as e: st.error(f"Error: {e}")
+            else: st.warning("Completa los campos obligatorios")
 
 # --- TAB 2: GASTOS ---
 with tabs[1]:
@@ -165,10 +170,13 @@ with tabs[1]:
         with st.form("f_gasto_nuevo", clear_on_submit=True):
             f_gasto = st.date_input("Fecha", hoy_cr_dt.date())
             tipo = st.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
-            monto = st.number_input("Monto (CRC)", min_value=0)
+            
+            # Escritura inteligente: value=None para campo vacío
+            monto = st.number_input("Monto (CRC)", min_value=0, value=None, placeholder="Monto del gasto...")
+            
             foto = st.file_uploader("Subir foto", type=['jpg', 'png', 'jpeg'])
             if st.form_submit_button("GUARDAR GASTO"):
-                if monto > 0:
+                if monto is not None and monto > 0:
                     foto_b64 = procesar_foto(foto) if foto else None
                     supabase.table("gastos").insert({
                         "fecha": str(f_gasto), "concepto": tipo, "monto": int(monto), 
@@ -176,6 +184,7 @@ with tabs[1]:
                     }).execute()
                     st.markdown("<div class='success-shield'>GASTO REGISTRADO</div>", unsafe_allow_html=True)
                     time.sleep(1.5); st.rerun()
+                else: st.warning("Ingresa un monto válido")
 
     if not df_f.empty:
         for i, row in df_f.iterrows():
