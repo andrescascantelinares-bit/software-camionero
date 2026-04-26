@@ -33,7 +33,7 @@ def get_base64(file_path):
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-# --- 2. DISEÑO VISUAL Y LUCES NEÓN ---
+# --- 2. DISEÑO VISUAL Y LUCES LED (ESTILO AISAAC-SHIELD) ---
 fondo_b64 = get_base64(st.secrets.get("APP_BACKGROUND_PATH") if "APP_BACKGROUND_PATH" in st.secrets else None)
 
 st.markdown(f"""
@@ -42,17 +42,20 @@ st.markdown(f"""
     .stApp {{ background-color: #000 !important; {f"background-image: url(data:image/png;base64,{fondo_b64});" if fondo_b64 else ""} background-size: cover; }}
     [data-testid="stAppViewBlockContainer"] {{ background-color: rgba(5, 5, 5, 0.92); padding: 1.5rem; border-radius: 25px; border: 1px solid #25D366; }}
     
-    .header-shield {{
-        background: rgba(0, 0, 0, 0.8);
+    /* RÓTULO LED SUPERIOR */
+    .header-shield-led {{
+        background: rgba(0, 0, 0, 0.9);
         padding: 15px;
         border-radius: 15px;
-        border-bottom: 3px solid #25D366;
+        border: 2px solid #25D366;
         text-align: center;
         margin-bottom: 20px;
+        box-shadow: 0 0 15px rgba(37, 211, 102, 0.6), inset 0 0 5px rgba(37, 211, 102, 0.3);
+        text-shadow: 0 0 10px rgba(37, 211, 102, 1);
     }}
 
-    /* EFECTO DE LUCES NEÓN FINAL */
-    .neon-shield {{
+    /* RÓTULO LED INFERIOR (ANIMADO) */
+    .neon-shield-final {{
         text-align: center;
         color: #25D366 !important;
         font-weight: bold;
@@ -64,10 +67,10 @@ st.markdown(f"""
         background: rgba(37, 211, 102, 0.1);
         box-shadow: 0 0 20px rgba(37, 211, 102, 0.6), inset 0 0 10px rgba(37, 211, 102, 0.4);
         text-shadow: 0 0 12px rgba(37, 211, 102, 1);
-        animation: pulse-neon 2s infinite alternate;
+        animation: pulse-led 2s infinite alternate;
     }}
 
-    @keyframes pulse-neon {{
+    @keyframes pulse-led {{
         from {{ box-shadow: 0 0 10px rgba(37, 211, 102, 0.4); }}
         to {{ box-shadow: 0 0 25px rgba(37, 211, 102, 0.8); }}
     }}
@@ -78,7 +81,7 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
-    /* BOTONES DE EXPORTACIÓN CON COLORES OFICIALES */
+    /* BOTONES DE EXPORTACIÓN: EXCEL VERDE / PDF ROJO */
     div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stDownloadButton"] button {{
         background: rgba(0, 50, 0, 0.8) !important;
         border: 2px solid #217346 !important;
@@ -95,11 +98,11 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIN ---
+# --- 3. LOGIN (CON RÓTULO LED) ---
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
-    st.markdown("<div class='header-shield'><h1>RUTAMASTER</h1></div>", unsafe_allow_html=True)
+    st.markdown("<div class='header-shield-led'><h1 style='margin:0;'>🚚 RUTAMASTER</h1></div>", unsafe_allow_html=True)
     pin = st.text_input("PIN DE ACCESO", type="password")
     if st.button("ENTRAR"):
         if pin == "8715": st.session_state.update({'autenticado': True, 'user': "dany"})
@@ -114,7 +117,7 @@ meses_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
 hoy_cr_dt = datetime.now(ZONA_CR)
 mes_actual_cr = hoy_cr_dt.month
 
-st.markdown(f"<div class='header-shield'><h2>{u.upper()}</h2></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='header-shield-led'><h2 style='margin:0;'>🚚 {u.upper()}</h2></div>", unsafe_allow_html=True)
 
 with st.expander(f"PERIODO: {st.session_state.get('mes_f', meses_nombres[mes_actual_cr-1])}", expanded=False):
     m_sel = st.segmented_control("Mes:", options=meses_nombres, default=meses_nombres[mes_actual_cr-1], key="mes_f")
@@ -145,8 +148,9 @@ with tabs[0]:
         dest = c4.text_input("Destino")
         c5, c6 = st.columns(2)
         
-        cost = c5.number_input("Costo (CRC)", min_value=0, value=None, placeholder="Monto...")
-        km = c6.number_input("KM Llegada", min_value=km_actual, value=None, placeholder=f"Min: {km_actual}")
+        # Escritura inteligente: sin 0 inicial
+        cost = c5.number_input("Costo (CRC)", min_value=0, value=None, placeholder="Escribe el monto...")
+        km = c6.number_input("KM Llegada", min_value=km_actual, value=None, placeholder=f"Mínimo: {km_actual}")
         
         if st.form_submit_button("REGISTRAR VIAJE"):
             if cli and orig and dest and km is not None:
@@ -154,7 +158,7 @@ with tabs[0]:
                     "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
                     "monto": int(cost) if cost else 0, "cliente_id": u, "km_actual": int(km)
                 }).execute()
-                st.success("VIAJE GUARDADO")
+                st.success("VIAJE GUARDADO CON ÉXITO")
                 time.sleep(1.5); st.rerun()
 
 # --- TAB 2: GASTOS ---
@@ -180,7 +184,7 @@ with tabs[1]:
             if st.button("Borrar", key=f"del_{row['id']}", use_container_width=True):
                 supabase.table("gastos").delete().eq("id", row['id']).execute(); st.rerun()
 
-# --- TAB 3: DATOS (CON EXPORTACIÓN A LA DERECHA) ---
+# --- TAB 3: DATOS (CON EXPORTACIÓN LED) ---
 with tabs[2]:
     c_metrics, c_btn_excel, c_btn_pdf = st.columns([2, 1, 1])
     with c_metrics:
@@ -202,5 +206,5 @@ with tabs[2]:
                                file_name=f"Reporte_{u}.txt", mime="text/plain", use_container_width=True)
         st.dataframe(df_export, hide_index=True, use_container_width=True)
 
-# --- CIERRE DE APLICACIÓN CON LUCES NEÓN ---
-st.markdown("<div class='neon-shield'>🛡️ AISAAC-SHIELD PROTECTED</div>", unsafe_allow_html=True)
+# --- CIERRE DE APLICACIÓN CON RÓTULO LED ANIMADO ---
+st.markdown("<div class='neon-shield-final'>🛡️ AISAAC-SHIELD PROTECTED</div>", unsafe_allow_html=True)
