@@ -117,7 +117,7 @@ try:
     km_actual = rv.data[0]['km_actual'] if rv.data else 0
 except: pass
 
-tabs = st.tabs(["📝 REGISTRO", "📉 GASTOS", "📊 DATOS"])
+tabs = st.tabs(["REGISTRO", "GASTOS", "DATOS"])
 
 # --- TAB 1: REGISTRO ---
 with tabs[0]:
@@ -138,13 +138,13 @@ with tabs[0]:
                     "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
                     "monto": int(cost), "cliente_id": u, "km_actual": int(km)
                 }).execute()
-                st.markdown("<div class='success-shield'>✅ ¡VIAJE GUARDADO CON ÉXITO!</div>", unsafe_allow_html=True)
+                st.markdown("<div class='success-shield'>¡VIAJE GUARDADO CON ÉXITO!</div>", unsafe_allow_html=True)
                 st.balloons()
                 time.sleep(2); st.rerun()
 
 # --- TAB 2: GASTOS ---
 with tabs[1]:
-    with st.expander("➕ AGREGAR GASTO", expanded=False):
+    with st.expander("AGREGAR GASTO", expanded=False):
         with st.form("f_gasto_nuevo", clear_on_submit=True):
             f_gasto = st.date_input("Fecha", hoy_cr_dt.date())
             tipo = st.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
@@ -179,8 +179,59 @@ with tabs[1]:
 
 # --- TAB 3: DATOS ---
 with tabs[2]:
-    st.metric("KM ACTUAL", f"{km_actual:,} KM")
+    # Usamos columnas: Las métricas a la izquierda (ancho 2), botones a la derecha (ancho 1 cada uno)
+    c_metrics, c_btn_excel, c_btn_pdf = st.columns([2, 1, 1])
+    
+    with c_metrics:
+        st.metric("KM ACTUAL", f"{km_actual:,} KM")
+        if not df_f.empty:
+            st.metric(f"TOTAL {m_sel.upper()}", f"₡{df_f['monto'].sum():,}")
+    
     if not df_f.empty:
-        st.metric(f"TOTAL {m_sel.upper()}", f"₡{df_f['monto'].sum():,}")
-        st.dataframe(df_f[['fecha', 'concepto', 'monto']], hide_index=True, use_container_width=True)
-    st.markdown("<div style='text-align:center; color:#25D366; margin-top:20px;'>🛡️ AISAAC-SHIELD PROTECTED</div>", unsafe_allow_html=True)
+        # Preparar datos para exportar
+        df_export = df_f[['fecha', 'concepto', 'monto']].copy()
+        df_export['fecha'] = df_export['fecha'].dt.strftime('%Y-%m-%d')
+        
+        # 1. Exportar a Excel (CSV)
+        csv_data = df_export.to_csv(index=False).encode('utf-8')
+        with c_btn_excel:
+            st.markdown("<br>", unsafe_allow_html=True) # Espacio para alinear
+            st.download_button(
+                label="📊 EXCEL",
+                data=csv_data,
+                file_name=f"Gastos_{u}_{m_sel}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+            
+        # 2. Exportar a Reporte (Formato texto plano tipo ticket de seguridad)
+        with c_btn_pdf:
+            st.markdown("<br>", unsafe_allow_html=True) # Espacio para alinear
+            reporte_txt = f"""
+            ====================================
+            🛡️ AISAAC-SHIELD - REPORTE DE GASTOS
+            ====================================
+            USUARIO: {u.upper()}
+            PERIODO: {m_sel.upper()}
+            KM ACTUAL: {km_actual}
+            TOTAL GASTOS: ₡{df_export['monto'].sum():,}
+            ------------------------------------
+            DETALLE:
+            {df_export.to_string(index=False)}
+            ====================================
+            """
+            st.download_button(
+                label="📄 REPORTE",
+                data=reporte_txt,
+                file_name=f"Reporte_{u}_{m_sel}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+
+        # Mostrar la tabla en pantalla
+        st.dataframe(df_export, hide_index=True, use_container_width=True)
+        
+    else:
+        st.info("No hay datos para exportar en este periodo.")
+        
+    st.markdown("<div style='text-align:center; color:#25D366; margin-top:30px;'>🛡️ AISAAC-SHIELD PROTECTED</div>", unsafe_allow_html=True)
