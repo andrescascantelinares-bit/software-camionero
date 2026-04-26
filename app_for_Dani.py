@@ -42,7 +42,6 @@ st.markdown(f"""
     .stApp {{ background-color: #000 !important; {f"background-image: url(data:image/png;base64,{fondo_b64});" if fondo_b64 else ""} background-size: cover; }}
     [data-testid="stAppViewBlockContainer"] {{ background-color: rgba(5, 5, 5, 0.92); padding: 1.5rem; border-radius: 25px; border: 1px solid #25D366; }}
     
-    /* TÍTULO IMPACTANTE */
     .header-shield {{
         background: rgba(0, 0, 0, 0.8);
         padding: 15px;
@@ -50,10 +49,8 @@ st.markdown(f"""
         border-bottom: 3px solid #25D366;
         text-align: center;
         margin-bottom: 20px;
-        box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);
     }}
 
-    /* TARJETAS DE GASTOS */
     .gasto-card {{ 
         background: rgba(0, 0, 0, 0.95) !important; 
         padding: 20px; border-radius: 15px; border: 1px solid #25D366; 
@@ -62,7 +59,6 @@ st.markdown(f"""
     .gasto-fecha {{ color: #25D366 !important; font-weight: bold; }}
     .gasto-info {{ color: #FFFFFF !important; font-size: 1.1rem; }}
 
-    /* MENSAJE DE ÉXITO ULTRA VISIBLE */
     .success-shield {{
         background: #25D366;
         color: black !important;
@@ -75,6 +71,27 @@ st.markdown(f"""
         margin: 10px 0;
     }}
 
+    /* BOTONES DE EXPORTACIÓN PERSONALIZADOS */
+    div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stDownloadButton"] button {{
+        background: rgba(0, 50, 0, 0.8) !important;
+        border: 2px solid #217346 !important;
+        color: #217346 !important;
+    }}
+    div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stDownloadButton"] button:hover {{
+        background: #217346 !important;
+        color: white !important;
+    }}
+
+    div[data-testid="stColumn"]:nth-of-type(3) [data-testid="stDownloadButton"] button {{
+        background: rgba(50, 0, 0, 0.8) !important;
+        border: 2px solid #FF0000 !important;
+        color: #FF0000 !important;
+    }}
+    div[data-testid="stColumn"]:nth-of-type(3) [data-testid="stDownloadButton"] button:hover {{
+        background: #FF0000 !important;
+        color: white !important;
+    }}
+
     h1, h2, h3, label {{ color: #25D366 !important; }}
     .stButton>button {{ background: linear-gradient(90deg, #107C41, #25D366); color: white; border-radius: 12px; font-weight: bold; border: none; width: 100%; }}
 </style>
@@ -84,7 +101,7 @@ st.markdown(f"""
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False
 
 if not st.session_state['autenticado']:
-    st.markdown("<div class='header-shield'><h1>🚚 RUTAMASTER</h1></div>", unsafe_allow_html=True)
+    st.markdown("<div class='header-shield'><h1>RUTAMASTER</h1></div>", unsafe_allow_html=True)
     pin = st.text_input("PIN DE ACCESO", type="password")
     if st.button("ENTRAR"):
         if pin == "8715": st.session_state.update({'autenticado': True, 'user': "dany"})
@@ -99,9 +116,9 @@ meses_nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
 hoy_cr_dt = datetime.now(ZONA_CR)
 mes_actual_cr = hoy_cr_dt.month
 
-st.markdown(f"<div class='header-shield'><h2>🚚 {u.upper()}</h2></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='header-shield'><h2>{u.upper()}</h2></div>", unsafe_allow_html=True)
 
-with st.expander(f"📅 PERIODO: {st.session_state.get('mes_f', meses_nombres[mes_actual_cr-1])}", expanded=False):
+with st.expander(f"PERIODO: {st.session_state.get('mes_f', meses_nombres[mes_actual_cr-1])}", expanded=False):
     m_sel = st.segmented_control("Mes:", options=meses_nombres, default=meses_nombres[mes_actual_cr-1], key="mes_f")
 
 df_f = pd.DataFrame()
@@ -121,7 +138,7 @@ tabs = st.tabs(["REGISTRO", "GASTOS", "DATOS"])
 
 # --- TAB 1: REGISTRO ---
 with tabs[0]:
-    st.markdown("### 🏁 Finalizar Viaje")
+    st.markdown("### Finalizar Viaje")
     with st.form("f_viaje", clear_on_submit=True):
         fecha = st.date_input("Fecha", hoy_cr_dt.date())
         cli = st.text_input("Cliente / Empresa")
@@ -138,7 +155,7 @@ with tabs[0]:
                     "fecha": str(fecha), "cliente": cli, "origen": orig, "destino": dest, 
                     "monto": int(cost), "cliente_id": u, "km_actual": int(km)
                 }).execute()
-                st.markdown("<div class='success-shield'>¡VIAJE GUARDADO CON ÉXITO!</div>", unsafe_allow_html=True)
+                st.markdown("<div class='success-shield'>VIAJE GUARDADO CON EXITO</div>", unsafe_allow_html=True)
                 st.balloons()
                 time.sleep(2); st.rerun()
 
@@ -149,7 +166,7 @@ with tabs[1]:
             f_gasto = st.date_input("Fecha", hoy_cr_dt.date())
             tipo = st.selectbox("Concepto", ["Diesel", "Peaje", "Aceite", "Repuesto", "Otros"])
             monto = st.number_input("Monto (CRC)", min_value=0)
-            foto = st.file_uploader("Foto", type=['jpg', 'png', 'jpeg'])
+            foto = st.file_uploader("Subir foto", type=['jpg', 'png', 'jpeg'])
             if st.form_submit_button("GUARDAR GASTO"):
                 if monto > 0:
                     foto_b64 = procesar_foto(foto) if foto else None
@@ -157,7 +174,7 @@ with tabs[1]:
                         "fecha": str(f_gasto), "concepto": tipo, "monto": int(monto), 
                         "cliente_id": u, "foto_comprobante": foto_b64
                     }).execute()
-                    st.markdown("<div class='success-shield'>💰 GASTO REGISTRADO</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='success-shield'>GASTO REGISTRADO</div>", unsafe_allow_html=True)
                     time.sleep(1.5); st.rerun()
 
     if not df_f.empty:
@@ -171,15 +188,14 @@ with tabs[1]:
             c1, c2 = st.columns(2)
             with c1:
                 if row.get('foto_comprobante'):
-                    with st.popover("📷 Ver Foto", use_container_width=True):
+                    with st.popover("Ver Foto", use_container_width=True):
                         st.image(f"data:image/jpeg;base64,{row['foto_comprobante']}")
             with c2:
-                if st.button("🗑️ Borrar", key=f"del_{row['id']}", use_container_width=True):
+                if st.button("Borrar", key=f"del_{row['id']}", use_container_width=True):
                     supabase.table("gastos").delete().eq("id", row['id']).execute(); st.rerun()
 
 # --- TAB 3: DATOS ---
 with tabs[2]:
-    # Usamos columnas: Las métricas a la izquierda (ancho 2), botones a la derecha (ancho 1 cada uno)
     c_metrics, c_btn_excel, c_btn_pdf = st.columns([2, 1, 1])
     
     with c_metrics:
@@ -188,50 +204,22 @@ with tabs[2]:
             st.metric(f"TOTAL {m_sel.upper()}", f"₡{df_f['monto'].sum():,}")
     
     if not df_f.empty:
-        # Preparar datos para exportar
         df_export = df_f[['fecha', 'concepto', 'monto']].copy()
         df_export['fecha'] = df_export['fecha'].dt.strftime('%Y-%m-%d')
         
-        # 1. Exportar a Excel (CSV)
-        csv_data = df_export.to_csv(index=False).encode('utf-8')
         with c_btn_excel:
-            st.markdown("<br>", unsafe_allow_html=True) # Espacio para alinear
-            st.download_button(
-                label="📊 EXCEL",
-                data=csv_data,
-                file_name=f"Gastos_{u}_{m_sel}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.download_button(label="EXCEL", data=df_export.to_csv(index=False).encode('utf-8'), 
+                               file_name=f"Gastos_{u}_{m_sel}.csv", mime="text/csv", use_container_width=True)
             
-        # 2. Exportar a Reporte (Formato texto plano tipo ticket de seguridad)
         with c_btn_pdf:
-            st.markdown("<br>", unsafe_allow_html=True) # Espacio para alinear
-            reporte_txt = f"""
-            ====================================
-            🛡️ AISAAC-SHIELD - REPORTE DE GASTOS
-            ====================================
-            USUARIO: {u.upper()}
-            PERIODO: {m_sel.upper()}
-            KM ACTUAL: {km_actual}
-            TOTAL GASTOS: ₡{df_export['monto'].sum():,}
-            ------------------------------------
-            DETALLE:
-            {df_export.to_string(index=False)}
-            ====================================
-            """
-            st.download_button(
-                label="📄 REPORTE",
-                data=reporte_txt,
-                file_name=f"Reporte_{u}_{m_sel}.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
+            st.markdown("<br>", unsafe_allow_html=True)
+            reporte_txt = f"REPORTE GASTOS - {u.upper()}\nTOTAL: ₡{df_export['monto'].sum():,}\n\n{df_export.to_string(index=False)}"
+            st.download_button(label="PDF", data=reporte_txt, 
+                               file_name=f"Reporte_{u}_{m_sel}.txt", mime="text/plain", use_container_width=True)
 
-        # Mostrar la tabla en pantalla
         st.dataframe(df_export, hide_index=True, use_container_width=True)
-        
     else:
-        st.info("No hay datos para exportar en este periodo.")
+        st.info("Sin datos para exportar")
         
-    st.markdown("<div style='text-align:center; color:#25D366; margin-top:30px;'>🛡️ AISAAC-SHIELD PROTECTED</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; color:#25D366; margin-top:30px;'>AISAAC-SHIELD PROTECTED</div>", unsafe_allow_html=True)
